@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SharpFont {
+namespace SharpFontManaged {
     public class TextLayout {
         public List<Data> Stuff = new List<Data>();
 

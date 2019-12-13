@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 
-namespace SharpFont {
+namespace SharpFontManaged {
     /// <summary>
     /// Maintains a collection of fonts.
     /// </summary>

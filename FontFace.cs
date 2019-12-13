@@ -4,11 +4,13 @@ using System.IO;
 using System.Numerics;
 using System.Threading;
 
-namespace SharpFont {
+namespace SharpFontManaged
+{
     /// <summary>
     /// Represents a single font face, maintaining all font data in memory.
     /// </summary>
-    public sealed class FontFace {
+    public sealed class FontFace
+    {
         readonly Renderer renderer = new Renderer();
         readonly Interpreter interpreter;
         readonly BaseGlyph[] glyphs;
@@ -92,9 +94,11 @@ namespace SharpFont {
         /// All relevant font data is loaded into memory and retained by the FontFace object.
         /// Once the constructor finishes you are free to close the stream.
         /// </remarks>
-        public FontFace (Stream stream) {
+        public FontFace(Stream stream)
+        {
             // read the face header and table records
-            using (var reader = new DataReader(stream)) {
+            using (var reader = new DataReader(stream))
+            {
                 var tables = SfntTables.ReadFaceHeader(reader);
 
                 // read head and maxp tables for font metadata and limits
@@ -111,7 +115,8 @@ namespace SharpFont {
                 hmetrics = SfntTables.ReadMetricsTable(reader, head.GlyphCount, hMetricsHeader.MetricCount);
 
                 // font might optionally have vertical metrics
-                if (SfntTables.SeekToTable(reader, tables, FourCC.Vhea)) {
+                if (SfntTables.SeekToTable(reader, tables, FourCC.Vhea))
+                {
                     var vMetricsHeader = SfntTables.ReadMetricsHeader(reader);
 
                     SfntTables.SeekToTable(reader, tables, FourCC.Vmtx, required: true);
@@ -144,7 +149,8 @@ namespace SharpFont {
                 Description = names.Description;
 
                 // load glyphs if we have them
-                if (SfntTables.SeekToTable(reader, tables, FourCC.Glyf)) {
+                if (SfntTables.SeekToTable(reader, tables, FourCC.Glyf))
+                {
                     unsafe
                     {
                         // read in the loca table, which tells us the byte offset of each glyph
@@ -170,14 +176,16 @@ namespace SharpFont {
 
                 // metrics calculations: if the UseTypographicMetrics flag is set, then
                 // we should use the sTypo*** data for line height calculation
-                if (os2Data.UseTypographicMetrics) {
+                if (os2Data.UseTypographicMetrics)
+                {
                     // include the line gap in the ascent so that
                     // white space is distributed above the line
                     cellAscent = os2Data.TypographicAscender + os2Data.TypographicLineGap;
                     cellDescent = -os2Data.TypographicDescender;
                     lineHeight = os2Data.TypographicAscender + os2Data.TypographicLineGap - os2Data.TypographicDescender;
                 }
-                else {
+                else
+                {
                     // otherwise, we need to guess at whether hhea data or os/2 data has better line spacing
                     // this is the recommended procedure based on the OS/2 spec extra notes
                     cellAscent = os2Data.WinAscent;
@@ -199,7 +207,8 @@ namespace SharpFont {
                     os2Data.StrikeoutPosition : head.UnitsPerEm / 3;
 
                 // create some vertical metrics in case we haven't loaded any
-                verticalSynthesized = new MetricsEntry {
+                verticalSynthesized = new MetricsEntry
+                {
                     FrontSideBearing = os2Data.TypographicAscender,
                     Advance = os2Data.TypographicAscender - os2Data.TypographicDescender
                 };
@@ -230,14 +239,15 @@ namespace SharpFont {
         /// <param name="pointSize">The font point size.</param>
         /// <param name="dpi">The DPI of the screen.</param>
         /// <returns>The pixel size at the given resolution.</returns>
-        public static float ComputePixelSize (float pointSize, int dpi) => pointSize * dpi / 72;
+        public static float ComputePixelSize(float pointSize, int dpi) => pointSize * dpi / 72;
 
         /// <summary>
         /// Gets metrics for the font as a whole at a particular pixel size.
         /// </summary>
         /// <param name="pixelSize">The size of the font, in pixels.</param>
         /// <returns>The font's face metrics.</returns>
-        public FaceMetrics GetFaceMetrics (float pixelSize) {
+        public FaceMetrics GetFaceMetrics(float pixelSize)
+        {
             var scale = ComputeScale(pixelSize);
             return new FaceMetrics(
                 cellAscent * scale,
@@ -253,12 +263,47 @@ namespace SharpFont {
         }
 
         /// <summary>
+        /// Gets unscaled glyph data for a specific character.
+        /// </summary>
+        /// <param name="codePoint">The Unicode codepoint for which to retrieve glyph data.</param>
+        /// <returns>The glyph data if the font supports the given character; otherwise, <c>null</c>.</returns>
+        public SimpleGlyph GetGlyphUnscaled(CodePoint codePoint)
+        {
+            var glyphIndex = charMap.Lookup(codePoint);
+            if (glyphIndex < 0)
+                return null;
+            interpreter.SetControlValueTableUnscaled(controlValueTable, prepProgram);
+
+            // get metrics
+            var glyph = glyphs[glyphIndex];
+            var horizontal = hmetrics[glyphIndex];
+            var vtemp = vmetrics?[glyphIndex];
+            if (vtemp == null)
+            {
+                var synth = verticalSynthesized;
+                synth.FrontSideBearing -= glyph.MaxY;
+                vtemp = synth;
+            }
+            var vertical = vtemp.GetValueOrDefault();
+
+            // build and transform the glyph
+            var points = new List<PointF>(32);
+            var contours = new List<int>(32);
+            var transform = Matrix3x2.Identity;
+
+            var currentGlyphAsSimple = glyphs[glyphIndex] as SimpleGlyph;
+            currentGlyphAsSimple.Advance = horizontal.Advance;
+            return currentGlyphAsSimple;
+        }
+
+        /// <summary>
         /// Gets glyph data for a specific character.
         /// </summary>
         /// <param name="codePoint">The Unicode codepoint for which to retrieve glyph data.</param>
         /// <param name="pixelSize">The desired size of the font, in pixels.</param>
         /// <returns>The glyph data if the font supports the given character; otherwise, <c>null</c>.</returns>
-        public Glyph GetGlyph (CodePoint codePoint, float pixelSize) {
+        public Glyph GetGlyph(CodePoint codePoint, float pixelSize)
+        {
             var glyphIndex = charMap.Lookup(codePoint);
             if (glyphIndex < 0)
                 return null;
@@ -271,7 +316,8 @@ namespace SharpFont {
             var glyph = glyphs[glyphIndex];
             var horizontal = hmetrics[glyphIndex];
             var vtemp = vmetrics?[glyphIndex];
-            if (vtemp == null) {
+            if (vtemp == null)
+            {
                 var synth = verticalSynthesized;
                 synth.FrontSideBearing -= glyph.MaxY;
                 vtemp = synth;
@@ -282,6 +328,10 @@ namespace SharpFont {
             var points = new List<PointF>(32);
             var contours = new List<int>(32);
             var transform = Matrix3x2.CreateScale(scale);
+
+            var currentGlyphAsSimple = glyphs[glyphIndex] as SimpleGlyph;
+            if (currentGlyphAsSimple == null) return null;
+
             Geometry.ComposeGlyphs(glyphIndex, 0, ref transform, points, contours, glyphs);
 
             // add phantom points; these are used to define the extents of the glyph,
@@ -300,7 +350,7 @@ namespace SharpFont {
             var contourArray = contours.ToArray();
             interpreter.HintGlyph(pointArray, contourArray, glyphs[glyphIndex].Instructions);
 
-            return new Glyph(renderer, pointArray, contourArray, horizontal.Advance * scale);
+            return new Glyph(renderer, pointArray, contourArray, horizontal.Advance * scale, currentGlyphAsSimple);
         }
 
         /// <summary>
@@ -310,7 +360,8 @@ namespace SharpFont {
         /// <param name="right">The right character.</param>
         /// <param name="pixelSize">The size of the font, in pixels.</param>
         /// <returns>The amount of kerning to apply, if any.</returns>
-        public float GetKerning (CodePoint left, CodePoint right, float pixelSize) {
+        public float GetKerning(CodePoint left, CodePoint right, float pixelSize)
+        {
             if (kernTable == null)
                 return 0.0f;
 
@@ -327,11 +378,13 @@ namespace SharpFont {
         /// Returns a string representation of the font.
         /// </summary>
         /// <returns>The full name of the font.</returns>
-        public override string ToString () {
+        public override string ToString()
+        {
             return FullName;
         }
 
-        float ComputeScale (float pixelSize) {
+        float ComputeScale(float pixelSize)
+        {
             if (integerPpems)
                 pixelSize = (float)Math.Round(pixelSize);
             return pixelSize / unitsPerEm;
@@ -341,51 +394,107 @@ namespace SharpFont {
     /// <summary>
     /// Represents a single glyph of a font.
     /// </summary>
-    public sealed class Glyph {
-        readonly Renderer renderer;
-        readonly PointF[] points;
-        readonly int[] contours;
+    public sealed class Glyph
+    {
+        Renderer renderer;
+        public PointF[] points;
+        public int[] contours;
+
+        public int[] ContourEndpoints;
 
         /// <summary>
         /// The width of the glyph.
         /// </summary>
-        public readonly float Width;
+        public float Width;
 
         /// <summary>
         /// The height of the glyph.
         /// </summary>
-        public readonly float Height;
+        public float Height;
 
         /// <summary>
         /// The integer width of the glyph, as it will be rendered.
         /// </summary>
-        public readonly int RenderWidth;
+        public int RenderWidth;
 
         /// <summary>
         /// The integer height of the glyph, as it will be rendered.
         /// </summary>
-        public readonly int RenderHeight;
+        public int RenderHeight;
 
         /// <summary>
         /// The metrics to use when the glyph is laid out horizontally.
         /// </summary>
-        public readonly GlyphMetrics HorizontalMetrics;
+        public GlyphMetrics HorizontalMetrics;
 
         /// <summary>
         /// The metrics to use when the glyph is laid out vertically.
         /// </summary>
-        public readonly GlyphMetrics VerticalMetrics;
+        public GlyphMetrics VerticalMetrics;
 
-        internal Glyph (Renderer renderer, PointF[] points, int[] contours, float linearHorizontalAdvance) {
+        internal static Glyph GetGlypUnscaled(Renderer renderer, PointF[] points, int[] contours, float linearHorizontalAdvance, SimpleGlyph simpleGlyph)
+        {
+            var g = new Glyph();
+
+            g.renderer = renderer;
+            g.points = points;
+            g.contours = contours;
+            g.ContourEndpoints = simpleGlyph.ContourEndpoints;
+
+            if (g.points.Length == 0) return g;
+
+            //// find the bounding box
+            //var min = new Vector2(float.MaxValue, float.MaxValue);
+            //var max = new Vector2(float.MinValue, float.MinValue);
+
+            //for (int i = 0; i < points.Length; i++)
+            //{
+            //    min = Vector2.Min(min, points[i].P);
+            //    max = Vector2.Max(max, points[i].P);
+            //}
+
+            //// save the "pure" size of the glyph, in fractional pixels
+            //var size = max - min;
+            //g.Width = size.X;
+            //g.Height = size.Y;
+
+            //// find the "render" size of the glyph, in whole pixels
+            //var shiftX = (int)Math.Floor(min.X);
+            //var shiftY = (int)Math.Floor(min.Y);
+            //g.RenderWidth = (int)Math.Ceiling(max.X) - shiftX;
+            //g.RenderHeight = (int)Math.Ceiling(max.Y) - shiftY;
+
+            //// translate the points so that 0,0 is at the bottom left corner
+
+            ////var offset = new Vector2(0, 0);
+            ////for (int i = 0; i < points.Length; i++)
+            ////    points[i] = points[i].Offset(offset);
+
+            g.HorizontalMetrics = new GlyphMetrics(new Vector2(0, 0), points[points.Length - 1].P.X - points[points.Length - 2].P.X, linearHorizontalAdvance);
+            g.VerticalMetrics = new GlyphMetrics(new Vector2(0, 0), points[points.Length - 1].P.Y - points[points.Length - 2].P.Y, 0);
+
+            return g;
+        }
+
+        internal Glyph()
+        {
+
+        }
+
+        internal Glyph(Renderer renderer, PointF[] points, int[] contours, float linearHorizontalAdvance, SimpleGlyph simpleGlyph)
+        {
             this.renderer = renderer;
             this.points = points;
             this.contours = contours;
+            this.ContourEndpoints = simpleGlyph.ContourEndpoints;
+
 
             // find the bounding box
             var min = new Vector2(float.MaxValue, float.MaxValue);
             var max = new Vector2(float.MinValue, float.MinValue);
             var pointCount = points.Length - 4;
-            for (int i = 0; i < pointCount; i++) {
+            for (int i = 0; i < pointCount; i++)
+            {
                 min = Vector2.Min(min, points[i].P);
                 max = Vector2.Max(max, points[i].P);
             }
@@ -401,14 +510,14 @@ namespace SharpFont {
             RenderWidth = (int)Math.Ceiling(max.X) - shiftX;
             RenderHeight = (int)Math.Ceiling(max.Y) - shiftY;
 
-            // translate the points so that 0,0 is at the bottom left corner
+            // translate the points so that 0,0 is at the bottom left corner         
             var offset = new Vector2(-shiftX, -shiftY);
             for (int i = 0; i < pointCount; i++)
                 points[i] = points[i].Offset(offset);
 
-            HorizontalMetrics = new GlyphMetrics(new Vector2(min.X, max.Y), points[pointCount + 1].P.X - points[pointCount].P.X, linearHorizontalAdvance);
 
-            // TODO: vertical metrics
+            HorizontalMetrics = new GlyphMetrics(new Vector2(min.X, max.Y), points[pointCount + 1].P.X - points[pointCount].P.X, linearHorizontalAdvance);
+            VerticalMetrics = new GlyphMetrics(new Vector2(0, shiftY), points[pointCount + 1].P.Y - points[pointCount].P.Y, 0);
         }
 
         /// <summary>
@@ -418,7 +527,8 @@ namespace SharpFont {
         /// <remarks>
         /// If the surface is not large enough, the glyph will be clipped to fit.
         /// </remarks>
-        public void RenderTo (Surface surface) {
+        public void RenderTo(Surface surface)
+        {
             // check for an empty outline, which obviously results in an empty render
             if (points.Length <= 0 || contours.Length <= 0)
                 return;
@@ -432,7 +542,8 @@ namespace SharpFont {
             // walk each contour of the outline and render it
             var firstIndex = 0;
             renderer.Start(width, height);
-            for (int i = 0; i < contours.Length; i++) {
+            for (int i = 0; i < contours.Length; i++)
+            {
                 // decompose the contour into drawing commands
                 var lastIndex = contours[i];
                 Geometry.DecomposeContour(renderer, firstIndex, lastIndex, points);

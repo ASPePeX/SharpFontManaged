@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace SharpFont {
+namespace SharpFontManaged {
     class KerningTable {
         Dictionary<uint, int> table;
 

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.Serialization;
 
-namespace SharpFont {
+namespace SharpFontManaged {
     /// <summary>
     /// Represents errors that occur due to invalid data in a font file.
     /// </summary>

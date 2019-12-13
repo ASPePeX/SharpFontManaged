@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SharpFont {
+namespace SharpFontManaged {
     class SbitTable {
         public unsafe static SbitTable Read (DataReader reader, TableRecord[] tables) {
             if (!SfntTables.SeekToTable(reader, tables, FourCC.Eblc))

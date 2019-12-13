@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace SharpFont {
+namespace SharpFontManaged {
     class CharacterMap {
         Dictionary<CodePoint, int> table;
 

@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Numerics;
 
-namespace SharpFont {
-    struct FUnit {
+namespace SharpFontManaged {
+    public struct FUnit {
         int value;
 
         public static explicit operator int (FUnit v) => v.value;
@@ -17,7 +17,7 @@ namespace SharpFont {
         public static FUnit Min (FUnit a, FUnit b) => (FUnit)Math.Min(a.value, b.value);
     }
 
-    struct Point {
+    public struct Point {
         public FUnit X;
         public FUnit Y;
         public PointType Type;
@@ -33,7 +33,7 @@ namespace SharpFont {
         public static explicit operator Vector2 (Point p) => new Vector2((int)p.X, (int)p.Y);
     }
 
-    struct PointF {
+    public struct PointF {
         public Vector2 P;
         public PointType Type;
 
@@ -49,13 +49,14 @@ namespace SharpFont {
         public static implicit operator Vector2 (PointF p) => p.P;
     }
 
-    enum PointType {
+    public enum PointType {
         OnCurve,
         Quadratic,
-        Cubic
+        Cubic,
+        Undefined // ? (mr) perhaps needed
     }
 
-    static class Geometry {
+    public static class Geometry {
         public static void ComposeGlyphs (int glyphIndex, int startPoint, ref Matrix3x2 transform, List<PointF> basePoints, List<int> baseContours, BaseGlyph[] glyphTable) {
             var glyph = glyphTable[glyphIndex];
             var simple = glyph as SimpleGlyph;

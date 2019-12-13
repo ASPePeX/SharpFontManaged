@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Numerics;
 
-namespace SharpFont {
+namespace SharpFontManaged {
     class Interpreter {
         GraphicsState state;
         GraphicsState cvtState;
@@ -32,6 +32,37 @@ namespace SharpFont {
         }
 
         public void InitializeFunctionDefs (byte[] instructions) => Execute(new InstructionStream(instructions), false, true);
+
+        public void SetControlValueTableUnscaled(FUnit[] cvt, byte[] cvProgram)
+        {
+            if (controlValueTable == null)
+                controlValueTable = new float[cvt.Length];
+            for (int i = 0; i < cvt.Length; i++)
+                controlValueTable[i] = cvt[i] * 1;
+
+            zp0 = zp1 = zp2 = points;
+            state.Reset();
+            stack.Clear();
+
+            if (cvProgram != null)
+            {
+                Execute(new InstructionStream(cvProgram), false, false);
+
+                // save off the CVT graphics state so that we can restore it for each glyph we hint
+                if ((state.InstructionControl & InstructionControlFlags.UseDefaultGraphicsState) != 0)
+                    cvtState.Reset();
+                else
+                {
+                    // always reset a few fields; copy the reset
+                    cvtState = state;
+                    cvtState.Freedom = Vector2.UnitX;
+                    cvtState.Projection = Vector2.UnitX;
+                    cvtState.DualProjection = Vector2.UnitX;
+                    cvtState.RoundState = RoundMode.ToGrid;
+                    cvtState.Loop = 1;
+                }
+            }
+        }
 
         public void SetControlValueTable (FUnit[] cvt, float scale, float ppem, byte[] cvProgram) {
             if (this.scale == scale || cvt == null)

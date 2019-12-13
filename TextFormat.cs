@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SharpFont {
+namespace SharpFontManaged {
     public sealed class TextFormat {
         public FontFace Font { get; set; }
         public float Size { get; set; }

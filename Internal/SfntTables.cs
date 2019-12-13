@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Numerics;
 using System.Text;
 
-namespace SharpFont {
+namespace SharpFontManaged {
     // raw SFNT container table reading routines
     unsafe static class SfntTables {
         public static uint[] ReadTTCHeader (DataReader reader) {
@@ -656,7 +656,7 @@ namespace SharpFont {
         public string TypographicSubfamilyName;
     }
 
-    abstract class BaseGlyph {
+    public abstract class BaseGlyph {
         public byte[] Instructions;
         public int MinX;
         public int MinY;
@@ -664,9 +664,10 @@ namespace SharpFont {
         public int MaxY;
     }
 
-    class SimpleGlyph : BaseGlyph {
+    public class SimpleGlyph : BaseGlyph {
         public Point[] Points;
         public int[] ContourEndpoints;
+        public float Advance;
     }
 
     struct Subglyph {

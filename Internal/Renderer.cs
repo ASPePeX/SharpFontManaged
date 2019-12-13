@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Numerics;
 
-namespace SharpFont {
+namespace SharpFontManaged {
     // handles rasterizing curves to a bitmap
     // the algorithm is heavily inspired by the FreeType2 renderer; thanks guys!
-    unsafe class Renderer {
+    public  unsafe class Renderer {
         Surface surface;                // the surface we're currently rendering to
         int[] scanlines;                // one scanline per Y, points into cell buffer
         int[] curveLevels;

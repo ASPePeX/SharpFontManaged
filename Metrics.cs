@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Numerics;
 
-namespace SharpFont {
+namespace SharpFontManaged {
     /// <summary>
     /// Contains various metrics that apply to a font face as a whole, scaled for a particular size.
     /// </summary>

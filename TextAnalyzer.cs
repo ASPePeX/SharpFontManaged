@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
-namespace SharpFont {
+namespace SharpFontManaged {
     public interface IGlyphAtlas {
         int Width { get; }
         int Height { get; }
@@ -171,7 +171,7 @@ namespace SharpFont {
                     data.Bounds.Y,
                     data.Bounds.Width,
                     data.Bounds.Height
-                );
+                    );
 
                 pen.X += (float)Math.Round(data.AdvanceWidth);
             }

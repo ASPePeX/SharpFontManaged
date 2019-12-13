@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace SharpFont {
+namespace SharpFontManaged {
     struct Rect {
         public int X, Y, Width, Height;
 
