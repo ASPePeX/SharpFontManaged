@@ -4,10 +4,13 @@ using System.Globalization;
 using System.Numerics;
 using System.Text;
 
-namespace SharpFontManaged {
+namespace SharpFontManaged
+{
     // raw SFNT container table reading routines
-    unsafe static class SfntTables {
-        public static uint[] ReadTTCHeader (DataReader reader) {
+    internal static unsafe class SfntTables
+    {
+        public static uint[] ReadTTCHeader(DataReader reader)
+        {
             // read the file header; if we have a collection, we want to
             // figure out where all the different faces are in the file
             // if we don't have a collection, there's just one font in the file
@@ -22,13 +25,14 @@ namespace SharpFontManaged {
                 throw new InvalidFontException("Invalid TTC header");
 
             var offsets = new uint[count];
-            for (int i = 0; i < count; i++)
+            for (var i = 0; i < count; i++)
                 offsets[i] = reader.ReadUInt32BE();
 
             return offsets;
         }
 
-        public static TableRecord[] ReadFaceHeader (DataReader reader) {
+        public static TableRecord[] ReadFaceHeader(DataReader reader)
+        {
             var tag = reader.ReadUInt32BE();
             if (tag != TTFv1 && tag != TTFv2 && tag != FourCC.True)
                 throw new InvalidFontException("Unknown or unsupported sfnt version.");
@@ -38,8 +42,10 @@ namespace SharpFontManaged {
 
             // read each font table descriptor
             var tables = new TableRecord[tableCount];
-            for (int i = 0; i < tableCount; i++) {
-                tables[i] = new TableRecord {
+            for (var i = 0; i < tableCount; i++)
+            {
+                tables[i] = new TableRecord
+                {
                     Tag = reader.ReadUInt32(),
                     CheckSum = reader.ReadUInt32BE(),
                     Offset = reader.ReadUInt32BE(),
@@ -50,14 +56,16 @@ namespace SharpFontManaged {
             return tables;
         }
 
-        public static void ReadHead (DataReader reader, TableRecord[] tables, out FaceHeader header) {
+        public static void ReadHead(DataReader reader, TableRecord[] tables, out FaceHeader header)
+        {
             SeekToTable(reader, tables, FourCC.Head, required: true);
 
             // 'head' table contains global information for the font face
             // we only care about a few fields in it
             reader.Skip(sizeof(int) * 4);   // version, revision, checksum, magic number
 
-            header = new FaceHeader {
+            header = new FaceHeader
+            {
                 Flags = (HeadFlags)reader.ReadUInt16BE(),
                 UnitsPerEm = reader.ReadUInt16BE()
             };
@@ -71,7 +79,8 @@ namespace SharpFontManaged {
             header.IndexFormat = (IndexFormat)reader.ReadInt16BE();
         }
 
-        public static void ReadMaxp (DataReader reader, TableRecord[] tables, ref FaceHeader header) {
+        public static void ReadMaxp(DataReader reader, TableRecord[] tables, ref FaceHeader header)
+        {
             SeekToTable(reader, tables, FourCC.Maxp, required: true);
 
             if (reader.ReadInt32BE() != 0x00010000)
@@ -94,14 +103,18 @@ namespace SharpFontManaged {
             if (header.MaxTwilightPoints > MaxTwilightPoints || header.MaxStorageLocations > MaxStorageLocations ||
                 header.MaxFunctionDefs > MaxFunctionDefs || header.MaxInstructionDefs > MaxFunctionDefs ||
                 header.MaxStackSize > MaxStackSize)
+            {
                 throw new InvalidFontException("Font programs have limits that are larger than built-in sanity checks.");
+            }
         }
 
-        public static MetricsHeader ReadMetricsHeader (DataReader reader) {
+        public static MetricsHeader ReadMetricsHeader(DataReader reader)
+        {
             // skip over version
             reader.Skip(sizeof(int));
 
-            var header = new MetricsHeader {
+            var header = new MetricsHeader
+            {
                 Ascender = reader.ReadInt16BE(),
                 Descender = reader.ReadInt16BE(),
                 LineGap = reader.ReadInt16BE()
@@ -115,10 +128,13 @@ namespace SharpFontManaged {
             return header;
         }
 
-        public static MetricsEntry[] ReadMetricsTable (DataReader reader, int glyphCount, int metricCount) {
+        public static MetricsEntry[] ReadMetricsTable(DataReader reader, int glyphCount, int metricCount)
+        {
             var results = new MetricsEntry[glyphCount];
-            for (int i = 0; i < metricCount; i++) {
-                results[i] = new MetricsEntry {
+            for (var i = 0; i < metricCount; i++)
+            {
+                results[i] = new MetricsEntry
+                {
                     Advance = reader.ReadUInt16BE(),
                     FrontSideBearing = reader.ReadInt16BE()
                 };
@@ -127,8 +143,10 @@ namespace SharpFontManaged {
             // there might be an additional array of fsb-only entries
             var extraCount = glyphCount - metricCount;
             var lastAdvance = results[metricCount - 1].Advance;
-            for (int i = 0; i < extraCount; i++) {
-                results[i + metricCount] = new MetricsEntry {
+            for (var i = 0; i < extraCount; i++)
+            {
+                results[i + metricCount] = new MetricsEntry
+                {
                     Advance = lastAdvance,
                     FrontSideBearing = reader.ReadInt16BE()
                 };
@@ -137,13 +155,15 @@ namespace SharpFontManaged {
             return results;
         }
 
-        public static OS2Data ReadOS2 (DataReader reader, TableRecord[] tables) {
+        public static OS2Data ReadOS2(DataReader reader, TableRecord[] tables)
+        {
             SeekToTable(reader, tables, FourCC.OS_2, required: true);
 
             // skip over version, xAvgCharWidth
             reader.Skip(sizeof(short) * 2);
 
-            var result = new OS2Data {
+            var result = new OS2Data
+            {
                 Weight = (FontWeight)reader.ReadUInt16BE(),
                 Stretch = (FontStretch)reader.ReadUInt16BE()
             };
@@ -185,7 +205,8 @@ namespace SharpFontManaged {
             return result;
         }
 
-        public static void ReadPost (DataReader reader, TableRecord[] tables, ref FaceHeader header) {
+        public static void ReadPost(DataReader reader, TableRecord[] tables, ref FaceHeader header)
+        {
             if (!SeekToTable(reader, tables, FourCC.Post))
                 return;
 
@@ -197,21 +218,25 @@ namespace SharpFontManaged {
             header.IsFixedPitch = reader.ReadUInt32BE() != 0;
         }
 
-        public static void ReadLoca (DataReader reader, TableRecord[] tables, IndexFormat format, uint* table, int count) {
+        public static void ReadLoca(DataReader reader, TableRecord[] tables, IndexFormat format, uint* table, int count)
+        {
             SeekToTable(reader, tables, FourCC.Loca, required: true);
 
-            if (format == IndexFormat.Short) {
+            if (format == IndexFormat.Short)
+            {
                 // values are ushort, divided by 2, so we need to shift back
-                for (int i = 0; i < count; i++)
+                for (var i = 0; i < count; i++)
                     *table++ = (uint)(reader.ReadUInt16BE() << 1);
             }
-            else {
-                for (int i = 0; i < count; i++)
+            else
+            {
+                for (var i = 0; i < count; i++)
                     *table++ = reader.ReadUInt32BE();
             }
         }
 
-        public unsafe static NameData ReadNames (DataReader reader, TableRecord[] tables) {
+        public static unsafe NameData ReadNames(DataReader reader, TableRecord[] tables)
+        {
             if (!SeekToTable(reader, tables, FourCC.Name))
                 return default(NameData);
 
@@ -224,7 +249,8 @@ namespace SharpFontManaged {
             // read name records, filtering out non-Unicode and platforms we don't know about
             var stringData = stackalloc StringData[count];
             var stringDataCount = 0;
-            for (int i = 0; i < count; i++) {
+            for (var i = 0; i < count; i++)
+            {
                 var platform = reader.ReadUInt16BE();
                 var encoding = reader.ReadUInt16BE();
                 var language = reader.ReadUInt16BE();
@@ -233,7 +259,8 @@ namespace SharpFontManaged {
                 var offset = reader.ReadUInt16BE();
 
                 // we only support Unicode strings
-                if (platform == PlatformID.Microsoft) {
+                if (platform == PlatformID.Microsoft)
+                {
                     if (encoding != WindowsEncoding.UnicodeBmp && encoding != WindowsEncoding.UnicodeFull)
                         continue;
 
@@ -241,9 +268,12 @@ namespace SharpFontManaged {
                         continue;
                 }
                 else if (platform != PlatformID.Unicode)
+                {
                     continue;
+                }
 
-                stringData[stringDataCount++] = new StringData {
+                stringData[stringDataCount++] = new StringData
+                {
                     Name = name,
                     Offset = offset,
                     Length = length
@@ -252,9 +282,11 @@ namespace SharpFontManaged {
 
             // find strings we care about and extract them from the blob
             var nameData = new NameData();
-            for (int i = 0; i < stringDataCount; i++) {
+            for (var i = 0; i < stringDataCount; i++)
+            {
                 var data = stringData[i];
-                switch (data.Name) {
+                switch (data.Name)
+                {
                     case NameID.FamilyName: nameData.FamilyName = ExtractString(reader, dataOffset, data); break;
                     case NameID.SubfamilyName: nameData.SubfamilyName = ExtractString(reader, dataOffset, data); break;
                     case NameID.UniqueID: nameData.UniqueID = ExtractString(reader, dataOffset, data); break;
@@ -269,7 +301,8 @@ namespace SharpFontManaged {
             return nameData;
         }
 
-        public static FUnit[] ReadCvt (DataReader reader, TableRecord[] tables) {
+        public static FUnit[] ReadCvt(DataReader reader, TableRecord[] tables)
+        {
             var index = FindTable(tables, FourCC.Cvt);
             if (index == -1)
                 return null;
@@ -277,13 +310,14 @@ namespace SharpFontManaged {
             reader.Seek(tables[index].Offset);
 
             var results = new FUnit[tables[index].Length / sizeof(short)];
-            for (int i = 0; i < results.Length; i++)
+            for (var i = 0; i < results.Length; i++)
                 results[i] = (FUnit)reader.ReadInt16BE();
 
             return results;
         }
 
-        public static byte[] ReadProgram (DataReader reader, TableRecord[] tables, FourCC tag) {
+        public static byte[] ReadProgram(DataReader reader, TableRecord[] tables, FourCC tag)
+        {
             var index = FindTable(tables, tag);
             if (index == -1)
                 return null;
@@ -292,10 +326,13 @@ namespace SharpFontManaged {
             return reader.ReadBytes((int)tables[index].Length);
         }
 
-        public static int FindTable (TableRecord[] tables, FourCC tag) {
+        public static int FindTable(TableRecord[] tables, FourCC tag)
+        {
             var index = -1;
-            for (int i = 0; i < tables.Length; i++) {
-                if (tables[i].Tag == tag) {
+            for (var i = 0; i < tables.Length; i++)
+            {
+                if (tables[i].Tag == tag)
+                {
                     index = i;
                     break;
                 }
@@ -304,10 +341,12 @@ namespace SharpFontManaged {
             return index;
         }
 
-        public static bool SeekToTable (DataReader reader, TableRecord[] tables, FourCC tag, bool required = false) {
+        public static bool SeekToTable(DataReader reader, TableRecord[] tables, FourCC tag, bool required = false)
+        {
             // check if we have the desired table and that it's not empty
             var index = FindTable(tables, tag);
-            if (index == -1 || tables[index].Length == 0) {
+            if (index == -1 || tables[index].Length == 0)
+            {
                 if (required)
                     throw new InvalidFontException($"Missing or empty '{tag}' table.");
                 return false;
@@ -318,10 +357,11 @@ namespace SharpFontManaged {
             return true;
         }
 
-        public static void ReadGlyph (
+        public static void ReadGlyph(
             DataReader reader, int glyphIndex, int recursionDepth,
             BaseGlyph[] glyphTable, uint glyfOffset, uint glyfLength, uint* loca
-        ) {
+        )
+        {
             // check if this glyph has already been loaded; this can happen
             // if we're recursively loading subglyphs as part of a composite
             if (glyphTable[glyphIndex] != null)
@@ -334,14 +374,17 @@ namespace SharpFontManaged {
             // check if this glyph doesn't have any actual data
             GlyphHeader header;
             var offset = loca[glyphIndex];
-            if ((glyphIndex < glyphTable.Length - 1 && offset == loca[glyphIndex + 1]) || offset >= glyfLength) {
+            if ((glyphIndex < glyphTable.Length - 1 && offset == loca[glyphIndex + 1]) || offset >= glyfLength)
+            {
                 // this is an empty glyph, so synthesize a header
                 header = default(GlyphHeader);
             }
-            else {
+            else
+            {
                 // seek to the right spot and load the header
                 reader.Seek(glyfOffset + loca[glyphIndex]);
-                header = new GlyphHeader {
+                header = new GlyphHeader
+                {
                     ContourCount = reader.ReadInt16BE(),
                     MinX = reader.ReadInt16BE(),
                     MinY = reader.ReadInt16BE(),
@@ -353,24 +396,28 @@ namespace SharpFontManaged {
                     throw new InvalidFontException("Invalid number of contours for glyph.");
             }
 
-            if (header.ContourCount > 0) {
+            if (header.ContourCount > 0)
+            {
                 // positive contours means a simple glyph
                 glyphTable[glyphIndex] = ReadSimpleGlyph(reader, header.ContourCount);
             }
-            else if (header.ContourCount == -1) {
+            else if (header.ContourCount == -1)
+            {
                 // -1 means composite glyph
                 var composite = ReadCompositeGlyph(reader);
                 var subglyphs = composite.Subglyphs;
 
                 // read each subglyph recrusively
-                for (int i = 0; i < subglyphs.Length; i++)
+                for (var i = 0; i < subglyphs.Length; i++)
                     ReadGlyph(reader, subglyphs[i].Index, recursionDepth + 1, glyphTable, glyfOffset, glyfLength, loca);
 
                 glyphTable[glyphIndex] = composite;
             }
-            else {
+            else
+            {
                 // no data, so synthesize an empty glyph
-                glyphTable[glyphIndex] = new SimpleGlyph {
+                glyphTable[glyphIndex] = new SimpleGlyph
+                {
                     Points = new Point[0],
                     ContourEndpoints = new int[0]
                 };
@@ -384,12 +431,14 @@ namespace SharpFontManaged {
             glyph.MaxY = header.MaxY;
         }
 
-        static SimpleGlyph ReadSimpleGlyph (DataReader reader, int contourCount) {
+        private static SimpleGlyph ReadSimpleGlyph(DataReader reader, int contourCount)
+        {
             // read contour endpoints
             var contours = new int[contourCount];
             var lastEndpoint = reader.ReadUInt16BE();
             contours[0] = lastEndpoint;
-            for (int i = 1; i < contours.Length; i++) {
+            for (var i = 1; i < contours.Length; i++)
+            {
                 var endpoint = reader.ReadUInt16BE();
                 contours[i] = endpoint;
                 if (contours[i] <= lastEndpoint)
@@ -408,15 +457,17 @@ namespace SharpFontManaged {
 
             // read flags
             var flags = new SimpleGlyphFlags[pointCount];
-            int flagIndex = 0;
-            while (flagIndex < flags.Length) {
+            var flagIndex = 0;
+            while (flagIndex < flags.Length)
+            {
                 var f = (SimpleGlyphFlags)reader.ReadByte();
                 flags[flagIndex++] = f;
 
                 // if Repeat is set, this flag data is repeated n more times
-                if ((f & SimpleGlyphFlags.Repeat) != 0) {
+                if ((f & SimpleGlyphFlags.Repeat) != 0)
+                {
                     var count = reader.ReadByte();
-                    for (int i = 0; i < count; i++)
+                    for (var i = 0; i < count; i++)
                         flags[flagIndex++] = f;
                 }
             }
@@ -425,65 +476,78 @@ namespace SharpFontManaged {
             // The point packing is insane; coords are either 1 byte or 2; they're
             // deltas from previous point, and flags let you repeat identical points.
             var x = 0;
-            for (int i = 0; i < points.Length; i++) {
+            for (var i = 0; i < points.Length; i++)
+            {
                 var f = flags[i];
                 var delta = 0;
 
-                if ((f & SimpleGlyphFlags.ShortX) != 0) {
+                if ((f & SimpleGlyphFlags.ShortX) != 0)
+                {
                     delta = reader.ReadByte();
                     if ((f & SimpleGlyphFlags.SameX) == 0)
                         delta = -delta;
                 }
                 else if ((f & SimpleGlyphFlags.SameX) == 0)
+                {
                     delta = reader.ReadInt16BE();
+                }
 
                 x += delta;
                 points[i].X = (FUnit)x;
             }
 
             var y = 0;
-            for (int i = 0; i < points.Length; i++) {
+            for (var i = 0; i < points.Length; i++)
+            {
                 var f = flags[i];
                 var delta = 0;
 
-                if ((f & SimpleGlyphFlags.ShortY) != 0) {
+                if ((f & SimpleGlyphFlags.ShortY) != 0)
+                {
                     delta = reader.ReadByte();
                     if ((f & SimpleGlyphFlags.SameY) == 0)
                         delta = -delta;
                 }
                 else if ((f & SimpleGlyphFlags.SameY) == 0)
+                {
                     delta = reader.ReadInt16BE();
+                }
 
                 y += delta;
                 points[i].Y = (FUnit)y;
                 points[i].Type = (f & SimpleGlyphFlags.OnCurve) != 0 ? PointType.OnCurve : PointType.Quadratic;
             }
 
-            return new SimpleGlyph {
+            return new SimpleGlyph
+            {
                 Points = points,
                 ContourEndpoints = contours,
                 Instructions = instructions
             };
         }
 
-        static CompositeGlyph ReadCompositeGlyph (DataReader reader) {
+        private static CompositeGlyph ReadCompositeGlyph(DataReader reader)
+        {
             // we need to keep reading glyphs for as long as
             // our flags tell us that there are more to read
             var subglyphs = new List<Subglyph>();
 
             CompositeGlyphFlags flags;
-            do {
+            do
+            {
                 flags = (CompositeGlyphFlags)reader.ReadUInt16BE();
 
                 var subglyph = new Subglyph { Flags = flags };
                 subglyph.Index = reader.ReadUInt16BE();
 
                 // read in args; they vary in size based on flags
-                if ((flags & CompositeGlyphFlags.ArgsAreWords) != 0) {
+                if ((flags & CompositeGlyphFlags.ArgsAreWords) != 0)
+                {
                     subglyph.Arg1 = reader.ReadInt16BE();
                     subglyph.Arg2 = reader.ReadInt16BE();
                 }
-                else {
+                else
+                {
                     subglyph.Arg1 = reader.ReadSByte();
                     subglyph.Arg2 = reader.ReadSByte();
                 }
@@ -492,16 +556,19 @@ namespace SharpFontManaged {
                 // scale, two independent scales, or a full 2x2 transform matrix
                 // transform components are in 2.14 fixed point format
                 var transform = Matrix3x2.Identity;
-                if ((flags & CompositeGlyphFlags.HaveScale) != 0) {
+                if ((flags & CompositeGlyphFlags.HaveScale) != 0)
+                {
                     var scale = reader.ReadInt16BE() / F2Dot14ToFloat;
                     transform.M11 = scale;
                     transform.M22 = scale;
                 }
-                else if ((flags & CompositeGlyphFlags.HaveXYScale) != 0) {
+                else if ((flags & CompositeGlyphFlags.HaveXYScale) != 0)
+                {
                     transform.M11 = reader.ReadInt16BE() / F2Dot14ToFloat;
                     transform.M22 = reader.ReadInt16BE() / F2Dot14ToFloat;
                 }
-                else if ((flags & CompositeGlyphFlags.HaveTransform) != 0) {
+                else if ((flags & CompositeGlyphFlags.HaveTransform) != 0)
+                {
                     transform.M11 = reader.ReadInt16BE() / F2Dot14ToFloat;
                     transform.M12 = reader.ReadInt16BE() / F2Dot14ToFloat;
                     transform.M21 = reader.ReadInt16BE() / F2Dot14ToFloat;
@@ -516,7 +583,8 @@ namespace SharpFontManaged {
             var result = new CompositeGlyph { Subglyphs = subglyphs.ToArray() };
 
             // if we have instructions, read them now
-            if ((flags & CompositeGlyphFlags.HaveInstructions) != 0) {
+            if ((flags & CompositeGlyphFlags.HaveInstructions) != 0)
+            {
                 var instructionLength = reader.ReadUInt16BE();
                 result.Instructions = reader.ReadBytes(instructionLength);
             }
@@ -524,7 +592,8 @@ namespace SharpFontManaged {
             return result;
         }
 
-        static string ExtractString (DataReader reader, uint baseOffset, StringData data) {
+        private static string ExtractString(DataReader reader, uint baseOffset, StringData data)
+        {
             reader.Seek(baseOffset + data.Offset);
 
             var bytes = reader.ReadBytes(data.Length);
@@ -533,20 +602,21 @@ namespace SharpFontManaged {
 
         // most of these limits are arbitrary; they can be increased if you
         // run into a font in the wild that is constrained by them
-        const uint TTFv1 = 0x10000;
-        const uint TTFv2 = 0x20000;
-        const int MaxGlyphs = short.MaxValue;
-        const int MaxContours = 256;
-        const int MaxRecursion = 128;
-        const int MaxFontsInCollection = 64;
-        const int MaxStackSize = 16384;
-        const int MaxTwilightPoints = short.MaxValue;
-        const int MaxFunctionDefs = 4096;
-        const int MaxStorageLocations = 16384;
-        const float F2Dot14ToFloat = 16384.0f;
+        private const uint TTFv1 = 0x10000;
+        private const uint TTFv2 = 0x20000;
+        private const int MaxGlyphs = short.MaxValue;
+        private const int MaxContours = 256;
+        private const int MaxRecursion = 128;
+        private const int MaxFontsInCollection = 64;
+        private const int MaxStackSize = 16384;
+        private const int MaxTwilightPoints = short.MaxValue;
+        private const int MaxFunctionDefs = 4096;
+        private const int MaxStorageLocations = 16384;
+        private const float F2Dot14ToFloat = 16384.0f;
 
         [Flags]
-        enum SimpleGlyphFlags {
+        private enum SimpleGlyphFlags
+        {
             None = 0,
             OnCurve = 0x1,
             ShortX = 0x2,
@@ -557,7 +627,8 @@ namespace SharpFontManaged {
         }
 
         [Flags]
-        enum FsSelectionFlags {
+        private enum FsSelectionFlags
+        {
             Italic = 0x1,
             Bold = 0x20,
             Regular = 0x40,
@@ -565,8 +636,9 @@ namespace SharpFontManaged {
             WWS = 0x100,
             Oblique = 0x200
         }
-        
-        struct GlyphHeader {
+
+        private struct GlyphHeader
+        {
             public short ContourCount;
             public short MinX;
             public short MinY;
@@ -574,13 +646,15 @@ namespace SharpFontManaged {
             public short MaxY;
         }
 
-        struct StringData {
+        private struct StringData
+        {
             public ushort Name;
             public ushort Offset;
             public ushort Length;
         }
 
-        static class NameID {
+        private static class NameID
+        {
             public const int FamilyName = 1;
             public const int SubfamilyName = 2;
             public const int UniqueID = 3;
@@ -592,16 +666,21 @@ namespace SharpFontManaged {
         }
     }
 
-    struct TableRecord {
+    internal struct TableRecord
+    {
         public FourCC Tag;
         public uint CheckSum;
         public uint Offset;
         public uint Length;
 
-        public override string ToString () => Tag.ToString();
+        public override string ToString()
+        {
+            return Tag.ToString();
+        }
     }
 
-    struct FaceHeader {
+    internal struct FaceHeader
+    {
         public HeadFlags Flags;
         public int UnitsPerEm;
         public IndexFormat IndexFormat;
@@ -616,19 +695,22 @@ namespace SharpFontManaged {
         public int MaxStackSize;
     }
 
-    struct MetricsHeader {
+    internal struct MetricsHeader
+    {
         public int Ascender;
         public int Descender;
         public int LineGap;
         public int MetricCount;
     }
 
-    struct MetricsEntry {
+    internal struct MetricsEntry
+    {
         public int Advance;
         public int FrontSideBearing;
     }
 
-    struct OS2Data {
+    internal struct OS2Data
+    {
         public FontWeight Weight;
         public FontStretch Stretch;
         public FontStyle Style;
@@ -645,7 +727,8 @@ namespace SharpFontManaged {
         public int CapHeight;
     }
 
-    struct NameData {
+    internal struct NameData
+    {
         public string FamilyName;
         public string SubfamilyName;
         public string UniqueID;
@@ -656,7 +739,8 @@ namespace SharpFontManaged {
         public string TypographicSubfamilyName;
     }
 
-    public abstract class BaseGlyph {
+    public abstract class BaseGlyph
+    {
         public byte[] Instructions;
         public int MinX;
         public int MinY;
@@ -664,13 +748,15 @@ namespace SharpFontManaged {
         public int MaxY;
     }
 
-    public class SimpleGlyph : BaseGlyph {
+    public class SimpleGlyph : BaseGlyph
+    {
         public Point[] Points;
         public int[] ContourEndpoints;
         public float Advance;
     }
 
-    struct Subglyph {
+    internal struct Subglyph
+    {
         public Matrix3x2 Transform;
         public CompositeGlyphFlags Flags;
         public int Index;
@@ -678,31 +764,37 @@ namespace SharpFontManaged {
         public int Arg2;
     }
 
-    class CompositeGlyph : BaseGlyph {
+    internal class CompositeGlyph : BaseGlyph
+    {
         public Subglyph[] Subglyphs;
     }
 
-    static class PlatformID {
+    internal static class PlatformID
+    {
         public const int Unicode = 0;
         public const int Microsoft = 3;
     }
 
-    static class WindowsEncoding {
+    internal static class WindowsEncoding
+    {
         public const int UnicodeBmp = 1;
         public const int UnicodeFull = 10;
     }
 
-    static class UnicodeEncoding {
+    internal static class UnicodeEncoding
+    {
         public const int Unicode32 = 4;
     }
 
-    enum IndexFormat {
+    internal enum IndexFormat
+    {
         Short,
         Long
     }
 
     [Flags]
-    enum CompositeGlyphFlags {
+    internal enum CompositeGlyphFlags
+    {
         None = 0,
         ArgsAreWords = 0x1,
         ArgsAreXYValues = 0x2,
@@ -717,7 +809,8 @@ namespace SharpFontManaged {
     }
 
     [Flags]
-    enum HeadFlags {
+    internal enum HeadFlags
+    {
         None = 0,
         SimpleBaseline = 0x1,
         SimpleLsb = 0x2,
@@ -727,20 +820,24 @@ namespace SharpFontManaged {
     }
 
     // helper wrapper around 4CC codes for debugging purposes
-    struct FourCC {
-        uint value;
+    internal struct FourCC
+    {
+        private readonly uint value;
 
-        public FourCC (uint value) {
+        public FourCC(uint value)
+        {
             this.value = value;
         }
 
-        public FourCC (string str) {
+        public FourCC(string str)
+        {
             if (str.Length != 4)
                 throw new InvalidOperationException("Invalid FourCC code");
             value = str[0] | ((uint)str[1] << 8) | ((uint)str[2] << 16) | ((uint)str[3] << 24);
         }
 
-        public override string ToString () {
+        public override string ToString()
+        {
             return new string(new[] {
                     (char)(value & 0xff),
                     (char)((value >> 8) & 0xff),
@@ -749,9 +846,20 @@ namespace SharpFontManaged {
                 });
         }
 
-        public static implicit operator FourCC (string value) => new FourCC(value);
-        public static implicit operator FourCC (uint value) => new FourCC(value);
-        public static implicit operator uint (FourCC fourCC) => fourCC.value;
+        public static implicit operator FourCC(string value)
+        {
+            return new FourCC(value);
+        }
+
+        public static implicit operator FourCC(uint value)
+        {
+            return new FourCC(value);
+        }
+
+        public static implicit operator uint(FourCC fourCC)
+        {
+            return fourCC.value;
+        }
 
         public static readonly FourCC Otto = "OTTO";
         public static readonly FourCC True = "true";

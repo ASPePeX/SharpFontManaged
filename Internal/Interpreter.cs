@@ -1,27 +1,30 @@
 ﻿using System;
 using System.Numerics;
 
-namespace SharpFontManaged {
-    class Interpreter {
-        GraphicsState state;
-        GraphicsState cvtState;
-        ExecutionStack stack;
-        InstructionStream[] functions;
-        InstructionStream[] instructionDefs;
-        float[] controlValueTable;
-        int[] storage;
-        int[] contours;
-        float scale;
-        int ppem;
-        int callStackSize;
-        float fdotp;
-        float roundThreshold;
-        float roundPhase;
-        float roundPeriod;
-        Zone zp0, zp1, zp2;
-        Zone points, twilight;
+namespace SharpFontManaged
+{
+    internal class Interpreter
+    {
+        private GraphicsState state;
+        private GraphicsState cvtState;
+        private readonly ExecutionStack stack;
+        private readonly InstructionStream[] functions;
+        private readonly InstructionStream[] instructionDefs;
+        private float[] controlValueTable;
+        private readonly int[] storage;
+        private int[] contours;
+        private float scale;
+        private int ppem;
+        private int callStackSize;
+        private float fdotp;
+        private float roundThreshold;
+        private float roundPhase;
+        private float roundPeriod;
+        private Zone zp0, zp1, zp2;
+        private Zone points, twilight;
 
-        public Interpreter (int maxStack, int maxStorage, int maxFunctions, int maxInstructionDefs, int maxTwilightPoints) {
+        public Interpreter(int maxStack, int maxStorage, int maxFunctions, int maxInstructionDefs, int maxTwilightPoints)
+        {
             stack = new ExecutionStack(maxStack);
             storage = new int[maxStorage];
             functions = new InstructionStream[maxFunctions];
@@ -31,13 +34,16 @@ namespace SharpFontManaged {
             twilight = new Zone(new PointF[maxTwilightPoints], isTwilight: true);
         }
 
-        public void InitializeFunctionDefs (byte[] instructions) => Execute(new InstructionStream(instructions), false, true);
+        public void InitializeFunctionDefs(byte[] instructions)
+        {
+            Execute(new InstructionStream(instructions), false, true);
+        }
 
         public void SetControlValueTableUnscaled(FUnit[] cvt, byte[] cvProgram)
         {
             if (controlValueTable == null)
                 controlValueTable = new float[cvt.Length];
-            for (int i = 0; i < cvt.Length; i++)
+            for (var i = 0; i < cvt.Length; i++)
                 controlValueTable[i] = cvt[i] * 1;
 
             zp0 = zp1 = zp2 = points;
@@ -50,7 +56,9 @@ namespace SharpFontManaged {
 
                 // save off the CVT graphics state so that we can restore it for each glyph we hint
                 if ((state.InstructionControl & InstructionControlFlags.UseDefaultGraphicsState) != 0)
+                {
                     cvtState.Reset();
+                }
                 else
                 {
                     // always reset a few fields; copy the reset
@@ -64,13 +72,14 @@ namespace SharpFontManaged {
             }
         }
 
-        public void SetControlValueTable (FUnit[] cvt, float scale, float ppem, byte[] cvProgram) {
+        public void SetControlValueTable(FUnit[] cvt, float scale, float ppem, byte[] cvProgram)
+        {
             if (this.scale == scale || cvt == null)
                 return;
 
             if (controlValueTable == null)
                 controlValueTable = new float[cvt.Length];
-            for (int i = 0; i < cvt.Length; i++)
+            for (var i = 0; i < cvt.Length; i++)
                 controlValueTable[i] = cvt[i] * scale;
 
             this.scale = scale;
@@ -79,13 +88,17 @@ namespace SharpFontManaged {
             state.Reset();
             stack.Clear();
 
-            if (cvProgram != null) {
+            if (cvProgram != null)
+            {
                 Execute(new InstructionStream(cvProgram), false, false);
 
                 // save off the CVT graphics state so that we can restore it for each glyph we hint
                 if ((state.InstructionControl & InstructionControlFlags.UseDefaultGraphicsState) != 0)
+                {
                     cvtState.Reset();
-                else {
+                }
+                else
+                {
                     // always reset a few fields; copy the reset
                     cvtState = state;
                     cvtState.Freedom = Vector2.UnitX;
@@ -97,14 +110,15 @@ namespace SharpFontManaged {
             }
         }
 
-        public void HintGlyph (PointF[] glyphPoints, int[] contours, byte[] instructions) {
+        public void HintGlyph(PointF[] glyphPoints, int[] contours, byte[] instructions)
+        {
             if (instructions == null || instructions.Length == 0)
                 return;
 
             // check if the CVT program disabled hinting
             if ((state.InstructionControl & InstructionControlFlags.InhibitGridFitting) != 0)
                 return;
-            
+
             // TODO: composite glyphs
             // TODO: round the phantom points?
 
@@ -120,7 +134,8 @@ namespace SharpFontManaged {
             OnVectorsUpdated();
 
             // normalize the round state settings
-            switch (state.RoundState) {
+            switch (state.RoundState)
+            {
                 case RoundMode.Super: SetSuperRound(1.0f); break;
                 case RoundMode.Super45: SetSuperRound(Sqrt2Over2); break;
             }
@@ -128,14 +143,17 @@ namespace SharpFontManaged {
             Execute(new InstructionStream(instructions), false, false);
         }
 
-        System.Collections.Generic.List<OpCode> debugList = new System.Collections.Generic.List<OpCode>();
+        private readonly System.Collections.Generic.List<OpCode> debugList = new System.Collections.Generic.List<OpCode>();
 
-        void Execute (InstructionStream stream, bool inFunction, bool allowFunctionDefs) {
+        private void Execute(InstructionStream stream, bool inFunction, bool allowFunctionDefs)
+        {
             // dispatch each instruction in the stream
-            while (!stream.Done) {
+            while (!stream.Done)
+            {
                 var opcode = stream.NextOpCode();
                 debugList.Add(opcode);
-                switch (opcode) {
+                switch (opcode)
+                {
                     // ==== PUSH INSTRUCTIONS ====
                     case OpCode.NPUSHB:
                     case OpCode.PUSHB1:
@@ -148,7 +166,7 @@ namespace SharpFontManaged {
                     case OpCode.PUSHB8:
                         {
                             var count = opcode == OpCode.NPUSHB ? stream.NextByte() : opcode - OpCode.PUSHB1 + 1;
-                            for (int i = 0; i < count; i++)
+                            for (var i = 0; i < count; i++)
                                 stack.Push(stream.NextByte());
                         }
                         break;
@@ -163,7 +181,7 @@ namespace SharpFontManaged {
                     case OpCode.PUSHW8:
                         {
                             var count = opcode == OpCode.NPUSHW ? stream.NextByte() : opcode - OpCode.PUSHW1 + 1;
-                            for (int i = 0; i < count; i++)
+                            for (var i = 0; i < count; i++)
                                 stack.Push(stream.NextWord());
                         }
                         break;
@@ -227,8 +245,11 @@ namespace SharpFontManaged {
                             var x = stack.Pop();
                             var vec = Vector2.Normalize(new Vector2(F2Dot14ToFloat(x), F2Dot14ToFloat(y)));
                             if (opcode == OpCode.SFVFS)
+                            {
                                 state.Freedom = vec;
-                            else {
+                            }
+                            else
+                            {
                                 state.Projection = vec;
                                 state.DualProjection = vec;
                             }
@@ -263,7 +284,8 @@ namespace SharpFontManaged {
                     case OpCode.INSTCTRL:
                         {
                             var selector = stack.Pop();
-                            if (selector >= 1 && selector <= 2) {
+                            if (selector >= 1 && selector <= 2)
+                            {
                                 // value is false if zero, otherwise shift the right bit into the flags
                                 var bit = 1 << (selector - 1);
                                 if (stack.Pop() == 0)
@@ -322,7 +344,8 @@ namespace SharpFontManaged {
                     // ==== POINT MODIFICATION ====
                     case OpCode.FLIPPT:
                         {
-                            for (int i = 0; i < state.Loop; i++) {
+                            for (var i = 0; i < state.Loop; i++)
+                            {
                                 var index = stack.Pop();
                                 if (points.Current[index].Type == PointType.OnCurve)
                                     points.Current[index].Type = PointType.Quadratic;
@@ -335,23 +358,21 @@ namespace SharpFontManaged {
                     case OpCode.FLIPRGON:
                         {
                             var end = stack.Pop();
-                            for (int i = stack.Pop(); i <= end; i++)
+                            for (var i = stack.Pop(); i <= end; i++)
                                 points.Current[i].Type = PointType.OnCurve;
                         }
                         break;
                     case OpCode.FLIPRGOFF:
                         {
                             var end = stack.Pop();
-                            for (int i = stack.Pop(); i <= end; i++)
+                            for (var i = stack.Pop(); i <= end; i++)
                                 points.Current[i].Type = PointType.Quadratic;
                         }
                         break;
                     case OpCode.SHP0:
                     case OpCode.SHP1:
                         {
-                            Zone zone;
-                            int point;
-                            var displacement = ComputeDisplacement((int)opcode, out zone, out point);
+                            var displacement = ComputeDisplacement((int)opcode, out var zone, out var point);
                             ShiftPoints(displacement);
                         }
                         break;
@@ -359,17 +380,17 @@ namespace SharpFontManaged {
                     case OpCode.SHC0:
                     case OpCode.SHC1:
                         {
-                            Zone zone;
-                            int point;
-                            var displacement = ComputeDisplacement((int)opcode, out zone, out point);
+                            var displacement = ComputeDisplacement((int)opcode, out var zone, out var point);
                             var touch = GetTouchState();
                             var contour = stack.Pop();
                             var start = contour == 0 ? 0 : contours[contour - 1] + 1;
                             var count = zp2.IsTwilight ? zp2.Current.Length : contours[contour] + 1;
 
-                            for (int i = start; i < count; i++) {
+                            for (var i = start; i < count; i++)
+                            {
                                 // don't move the reference point
-                                if (zone.Current != zp2.Current || point != i) {
+                                if (zone.Current != zp2.Current || point != i)
+                                {
                                     zp2.Current[i].P += displacement;
                                     zp2.TouchState[i] |= touch;
                                 }
@@ -379,16 +400,15 @@ namespace SharpFontManaged {
                     case OpCode.SHZ0:
                     case OpCode.SHZ1:
                         {
-                            Zone zone;
-                            int point;
-                            var displacement = ComputeDisplacement((int)opcode, out zone, out point);
+                            var displacement = ComputeDisplacement((int)opcode, out var zone, out var point);
                             var count = 0;
                             if (zp2.IsTwilight)
                                 count = zp2.Current.Length;
                             else if (contours.Length > 0)
                                 count = contours[contours.Length - 1] + 1;
 
-                            for (int i = 0; i < count; i++) {
+                            for (var i = 0; i < count; i++)
+                            {
                                 // don't move the reference point
                                 if (zone.Current != zp2.Current || point != i)
                                     zp2.Current[i].P += displacement;
@@ -402,7 +422,8 @@ namespace SharpFontManaged {
                             var pointIndex = stack.Pop();
 
                             // this instruction is used in the CVT to set up twilight points with original values
-                            if (zp0.IsTwilight) {
+                            if (zp0.IsTwilight)
+                            {
                                 var original = state.Freedom * distance;
                                 zp0.Original[pointIndex].P = original;
                                 zp0.Current[pointIndex].P = original;
@@ -411,7 +432,8 @@ namespace SharpFontManaged {
                             // current position of the point along the projection vector
                             var point = zp0.GetCurrent(pointIndex);
                             var currentPos = Project(point);
-                            if (opcode == OpCode.MIAP1) {
+                            if (opcode == OpCode.MIAP1)
+                            {
                                 // only use the CVT if we are above the cut-in point
                                 if (Math.Abs(distance - currentPos) > state.ControlValueCutIn)
                                     distance = currentPos;
@@ -429,7 +451,8 @@ namespace SharpFontManaged {
                             var pointIndex = stack.Pop();
                             var point = zp0.GetCurrent(pointIndex);
                             var distance = 0.0f;
-                            if (opcode == OpCode.MDAP1) {
+                            if (opcode == OpCode.MDAP1)
+                            {
                                 distance = Project(point);
                                 distance = Round(distance) - distance;
                             }
@@ -446,7 +469,8 @@ namespace SharpFontManaged {
                             var pointIndex = stack.Pop();
 
                             // if we're operating on the twilight zone, initialize the points
-                            if (zp1.IsTwilight) {
+                            if (zp1.IsTwilight)
+                            {
                                 zp1.Original[pointIndex].P = zp0.Original[state.Rp0].P + targetDistance * state.Freedom / fdotp;
                                 zp1.Current[pointIndex].P = zp1.Original[pointIndex].P;
                             }
@@ -467,14 +491,16 @@ namespace SharpFontManaged {
                             var originalRange = DualProject(zp1.GetOriginal(state.Rp2) - originalBase);
                             var currentRange = Project(zp1.GetCurrent(state.Rp2) - currentBase);
 
-                            for (int i = 0; i < state.Loop; i++) {
+                            for (var i = 0; i < state.Loop; i++)
+                            {
                                 var pointIndex = stack.Pop();
                                 var point = zp2.GetCurrent(pointIndex);
                                 var currentDistance = Project(point - currentBase);
                                 var originalDistance = DualProject(zp2.GetOriginal(pointIndex) - originalBase);
 
                                 var newDistance = 0.0f;
-                                if (originalDistance != 0.0f) {
+                                if (originalDistance != 0.0f)
+                                {
                                     // a range of 0.0f is invalid according to the spec (would result in a div by zero)
                                     if (originalRange == 0.0f)
                                         newDistance = originalDistance;
@@ -489,7 +515,8 @@ namespace SharpFontManaged {
                         break;
                     case OpCode.ALIGNRP:
                         {
-                            for (int i = 0; i < state.Loop; i++) {
+                            for (var i = 0; i < state.Loop; i++)
+                            {
                                 var pointIndex = stack.Pop();
                                 var p1 = zp1.GetCurrent(pointIndex);
                                 var p2 = zp0.GetCurrent(state.Rp0);
@@ -524,29 +551,35 @@ namespace SharpFontManaged {
                                 TouchState touchMask;
                                 byte* current;
                                 byte* original;
-                                if (opcode == OpCode.IUP0) {
+                                if (opcode == OpCode.IUP0)
+                                {
                                     touchMask = TouchState.Y;
                                     current = (byte*)&currentPtr->P.Y;
                                     original = (byte*)&originalPtr->P.Y;
                                 }
-                                else {
+                                else
+                                {
                                     touchMask = TouchState.X;
                                     current = (byte*)&currentPtr->P.X;
                                     original = (byte*)&originalPtr->P.X;
                                 }
 
                                 var point = 0;
-                                for (int i = 0; i < contours.Length; i++) {
+                                for (var i = 0; i < contours.Length; i++)
+                                {
                                     var endPoint = contours[i];
                                     var firstPoint = point;
                                     var firstTouched = -1;
                                     var lastTouched = -1;
 
-                                    for (; point <= endPoint; point++) {
+                                    for (; point <= endPoint; point++)
+                                    {
                                         // check whether this point has been touched
-                                        if ((points.TouchState[point] & touchMask) != 0) {
+                                        if ((points.TouchState[point] & touchMask) != 0)
+                                        {
                                             // if this is the first touched point in the contour, note it and continue
-                                            if (firstTouched < 0) {
+                                            if (firstTouched < 0)
+                                            {
                                                 firstTouched = point;
                                                 lastTouched = point;
                                                 continue;
@@ -560,23 +593,27 @@ namespace SharpFontManaged {
                                     }
 
                                     // check if we had any touched points at all in this contour
-                                    if (firstTouched >= 0) {
+                                    if (firstTouched >= 0)
+                                    {
                                         // there are two cases left to handle:
                                         // 1. there was only one touched point in the whole contour, in
                                         //    which case we want to shift everything relative to that one
                                         // 2. several touched points, in which case handle the gap from the
                                         //    beginning to the first touched point and the gap from the last
                                         //    touched point to the end of the contour
-                                        if (lastTouched == firstTouched) {
+                                        if (lastTouched == firstTouched)
+                                        {
                                             var delta = *GetPoint(current, lastTouched) - *GetPoint(original, lastTouched);
-                                            if (delta != 0.0f) {
-                                                for (int j = firstPoint; j < lastTouched; j++)
+                                            if (delta != 0.0f)
+                                            {
+                                                for (var j = firstPoint; j < lastTouched; j++)
                                                     *GetPoint(current, j) += delta;
-                                                for (int j = lastTouched + 1; j <= endPoint; j++)
+                                                for (var j = lastTouched + 1; j <= endPoint; j++)
                                                     *GetPoint(current, j) += delta;
                                             }
                                         }
-                                        else {
+                                        else
+                                        {
                                             InterpolatePoints(current, original, lastTouched + 1, endPoint, lastTouched, firstTouched);
                                             if (firstTouched > 0)
                                                 InterpolatePoints(current, original, firstPoint, firstTouched - 1, lastTouched, firstTouched);
@@ -599,11 +636,13 @@ namespace SharpFontManaged {
                             var da = a0 - a1;
                             var db = b0 - b1;
                             var den = (da.X * db.Y) - (da.Y * db.X);
-                            if (Math.Abs(den) <= Epsilon) {
+                            if (Math.Abs(den) <= Epsilon)
+                            {
                                 // parallel lines; spec says to put the ppoint "into the middle of the two lines"
                                 zp2.Current[index].P = (a0 + a1 + b0 + b1) / 4;
                             }
-                            else {
+                            else
+                            {
                                 var t = (a0.X * a1.Y) - (a0.Y * a1.X);
                                 var u = (b0.X * b1.Y) - (b0.Y * b1.X);
                                 var p = new Vector2(
@@ -631,11 +670,14 @@ namespace SharpFontManaged {
                         {
                             // value is false; jump to the next else block or endif marker
                             // otherwise, we don't have to do anything; we'll keep executing this block
-                            if (!stack.PopBool()) {
-                                int indent = 1;
-                                while (indent > 0) {
+                            if (!stack.PopBool())
+                            {
+                                var indent = 1;
+                                while (indent > 0)
+                                {
                                     opcode = SkipNext(ref stream);
-                                    switch (opcode) {
+                                    switch (opcode)
+                                    {
                                         case OpCode.IF: indent++; break;
                                         case OpCode.EIF: indent--; break;
                                         case OpCode.ELSE:
@@ -651,10 +693,12 @@ namespace SharpFontManaged {
                         {
                             // assume we hit the true statement of some previous if block
                             // if we had hit false, we would have jumped over this
-                            int indent = 1;
-                            while (indent > 0) {
+                            var indent = 1;
+                            while (indent > 0)
+                            {
                                 opcode = SkipNext(ref stream);
-                                switch (opcode) {
+                                switch (opcode)
+                                {
                                     case OpCode.IF: indent++; break;
                                     case OpCode.EIF: indent--; break;
                                 }
@@ -819,7 +863,7 @@ namespace SharpFontManaged {
 
                             var function = functions[stack.Pop()];
                             var count = opcode == OpCode.LOOPCALL ? stack.Pop() : 1;
-                            for (int i = 0; i < count; i++)
+                            for (var i = 0; i < count; i++)
                                 Execute(function, true, false);
                             callStackSize--;
                         }
@@ -842,7 +886,8 @@ namespace SharpFontManaged {
                     case OpCode.DELTAC3:
                         {
                             var last = stack.Pop();
-                            for (int i = 1; i <= last; i++) {
+                            for (var i = 1; i <= last; i++)
+                            {
                                 var cvtIndex = stack.Pop();
                                 var arg = stack.Pop();
 
@@ -853,7 +898,8 @@ namespace SharpFontManaged {
                                 triggerPpem += state.DeltaBase;
 
                                 // if the current ppem matches the trigger, apply the exception
-                                if (ppem == triggerPpem) {
+                                if (ppem == triggerPpem)
+                                {
                                     // the lower 4 bits of the arg is the amount to shift
                                     // it's encoded such that 0 isn't an allowable value (who wants to shift by 0 anyway?)
                                     var amount = (arg & 0xF) - 8;
@@ -873,7 +919,8 @@ namespace SharpFontManaged {
                     case OpCode.DELTAP3:
                         {
                             var last = stack.Pop();
-                            for (int i = 1; i <= last; i++) {
+                            for (var i = 1; i <= last; i++)
+                            {
                                 var pointIndex = stack.Pop();
                                 var arg = stack.Pop();
 
@@ -885,7 +932,8 @@ namespace SharpFontManaged {
                                     triggerPpem += (opcode - OpCode.DELTAP2 + 1) * 16;
 
                                 // if the current ppem matches the trigger, apply the exception
-                                if (ppem == triggerPpem) {
+                                if (ppem == triggerPpem)
+                                {
                                     // the lower 4 bits of the arg is the amount to shift
                                     // it's encoded such that 0 isn't an allowable value (who wants to shift by 0 anyway?)
                                     var amount = (arg & 0xF) - 8;
@@ -905,7 +953,8 @@ namespace SharpFontManaged {
                         {
                             var selector = stack.Pop();
                             var result = 0;
-                            if ((selector & 0x1) != 0) {
+                            if ((selector & 0x1) != 0)
+                            {
                                 // pretend we are MS Rasterizer v35
                                 result = 35;
                             }
@@ -926,10 +975,15 @@ namespace SharpFontManaged {
 
                     default:
                         if (opcode >= OpCode.MIRP)
+                        {
                             MoveIndirectRelative(opcode - OpCode.MIRP);
+                        }
                         else if (opcode >= OpCode.MDRP)
+                        {
                             MoveDirectRelative(opcode - OpCode.MDRP);
-                        else {
+                        }
+                        else
+                        {
                             // check if this is a runtime-defined opcode
                             var index = (int)opcode;
                             if (index > instructionDefs.Length || !instructionDefs[index].IsValid)
@@ -947,33 +1001,41 @@ namespace SharpFontManaged {
             }
         }
 
-        int CheckIndex (int index, int length) {
+        private int CheckIndex(int index, int length)
+        {
             if (index < 0 || index >= length)
                 throw new InvalidFontException();
             return index;
         }
 
-        float ReadCvt () => controlValueTable[CheckIndex(stack.Pop(), controlValueTable.Length)];
+        private float ReadCvt()
+        {
+            return controlValueTable[CheckIndex(stack.Pop(), controlValueTable.Length)];
+        }
 
-        void OnVectorsUpdated () {
+        private void OnVectorsUpdated()
+        {
             fdotp = Vector2.Dot(state.Freedom, state.Projection);
             if (Math.Abs(fdotp) < Epsilon)
                 fdotp = 1.0f;
         }
 
-        void SetFreedomVectorToAxis (int axis) {
+        private void SetFreedomVectorToAxis(int axis)
+        {
             state.Freedom = axis == 0 ? Vector2.UnitY : Vector2.UnitX;
             OnVectorsUpdated();
         }
 
-        void SetProjectionVectorToAxis (int axis) {
+        private void SetProjectionVectorToAxis(int axis)
+        {
             state.Projection = axis == 0 ? Vector2.UnitY : Vector2.UnitX;
             state.DualProjection = state.Projection;
 
             OnVectorsUpdated();
         }
 
-        void SetVectorToLine (int mode, bool dual) {
+        private void SetVectorToLine(int mode, bool dual)
+        {
             // mode here should be as follows:
             // 0: SPVTL0
             // 1: SPVTL1
@@ -985,38 +1047,50 @@ namespace SharpFontManaged {
             var p2 = zp1.GetCurrent(index2);
 
             var line = p2 - p1;
-            if (line.LengthSquared() == 0) {
+            if (line.LengthSquared() == 0)
+            {
                 // invalid; just set to whatever
                 if (mode >= 2)
+                {
                     state.Freedom = Vector2.UnitX;
-                else {
+                }
+                else
+                {
                     state.Projection = Vector2.UnitX;
                     state.DualProjection = Vector2.UnitX;
                 }
             }
-            else {
+            else
+            {
                 // if mode is 1 or 3, we want a perpendicular vector
                 if ((mode & 0x1) != 0)
                     line = new Vector2(-line.Y, line.X);
                 line = Vector2.Normalize(line);
 
                 if (mode >= 2)
+                {
                     state.Freedom = line;
-                else {
+                }
+                else
+                {
                     state.Projection = line;
                     state.DualProjection = line;
                 }
             }
 
             // set the dual projection vector using original points
-            if (dual) {
+            if (dual)
+            {
                 p1 = zp2.GetOriginal(index1);
                 p2 = zp2.GetOriginal(index2);
                 line = p2 - p1;
 
                 if (line.LengthSquared() == 0)
+                {
                     state.DualProjection = Vector2.UnitX;
-                else {
+                }
+                else
+                {
                     if ((mode & 0x1) != 0)
                         line = new Vector2(-line.Y, line.X);
 
@@ -1027,19 +1101,23 @@ namespace SharpFontManaged {
             OnVectorsUpdated();
         }
 
-        Zone GetZoneFromStack () {
-            switch (stack.Pop()) {
+        private Zone GetZoneFromStack()
+        {
+            switch (stack.Pop())
+            {
                 case 0: return twilight;
                 case 1: return points;
                 default: throw new InvalidFontException("Invalid zone pointer.");
             }
         }
 
-        void SetSuperRound (float period) {
+        private void SetSuperRound(float period)
+        {
             // mode is a bunch of packed flags
             // bits 7-6 are the period multiplier
             var mode = stack.Pop();
-            switch (mode & 0xC0) {
+            switch (mode & 0xC0)
+            {
                 case 0: roundPeriod = period / 2; break;
                 case 0x40: roundPeriod = period; break;
                 case 0x80: roundPeriod = period * 2; break;
@@ -1047,7 +1125,8 @@ namespace SharpFontManaged {
             }
 
             // bits 5-4 are the phase
-            switch (mode & 0x30) {
+            switch (mode & 0x30)
+            {
                 case 0: roundPhase = 0; break;
                 case 0x10: roundPhase = roundPeriod / 4; break;
                 case 0x20: roundPhase = roundPeriod / 2; break;
@@ -1061,14 +1140,16 @@ namespace SharpFontManaged {
                 roundThreshold = ((mode & 0xF) - 4) * roundPeriod / 8;
         }
 
-        void MoveIndirectRelative (int flags) {
+        private void MoveIndirectRelative(int flags)
+        {
             // this instruction tries to make the current distance between a given point
             // and the reference point rp0 be equivalent to the same distance in the original outline
             // there are a bunch of flags that control how that distance is measured
             var cvt = ReadCvt();
             var pointIndex = stack.Pop();
 
-            if (Math.Abs(cvt - state.SingleWidthValue) < state.SingleWidthCutIn) {
+            if (Math.Abs(cvt - state.SingleWidthValue) < state.SingleWidthCutIn)
+            {
                 if (cvt >= 0)
                     cvt = state.SingleWidthValue;
                 else
@@ -1077,7 +1158,8 @@ namespace SharpFontManaged {
 
             // if we're looking at the twilight zone we need to prepare the points there
             var originalReference = zp0.GetOriginal(state.Rp0);
-            if (zp1.IsTwilight) {
+            if (zp1.IsTwilight)
+            {
                 var initialValue = originalReference + state.Freedom * cvt;
                 zp1.Original[pointIndex].P = initialValue;
                 zp1.Current[pointIndex].P = initialValue;
@@ -1092,7 +1174,8 @@ namespace SharpFontManaged {
 
             // if bit 2 is set, round the distance and look at the cut-in value
             var distance = cvt;
-            if ((flags & 0x4) != 0) {
+            if ((flags & 0x4) != 0)
+            {
                 // only perform cut-in tests when both points are in the same zone
                 if (zp0.IsTwilight == zp1.IsTwilight && Math.Abs(cvt - originalDistance) > state.ControlValueCutIn)
                     cvt = originalDistance;
@@ -1100,7 +1183,8 @@ namespace SharpFontManaged {
             }
 
             // if bit 3 is set, constrain to the minimum distance
-            if ((flags & 0x8) != 0) {
+            if ((flags & 0x8) != 0)
+            {
                 if (originalDistance >= 0)
                     distance = Math.Max(distance, state.MinDistance);
                 else
@@ -1115,7 +1199,8 @@ namespace SharpFontManaged {
                 state.Rp0 = pointIndex;
         }
 
-        void MoveDirectRelative (int flags) {
+        private void MoveDirectRelative(int flags)
+        {
             // determine the original distance between the two reference points
             var pointIndex = stack.Pop();
             var p1 = zp0.GetOriginal(state.Rp0);
@@ -1123,7 +1208,8 @@ namespace SharpFontManaged {
             var originalDistance = DualProject(p2 - p1);
 
             // single width cutin test
-            if (Math.Abs(originalDistance - state.SingleWidthValue) < state.SingleWidthCutIn) {
+            if (Math.Abs(originalDistance - state.SingleWidthValue) < state.SingleWidthCutIn)
+            {
                 if (originalDistance >= 0)
                     originalDistance = state.SingleWidthValue;
                 else
@@ -1136,7 +1222,8 @@ namespace SharpFontManaged {
                 distance = Round(distance);
 
             // if bit 3 is set, constrain to the minimum distance
-            if ((flags & 0x8) != 0) {
+            if ((flags & 0x8) != 0)
+            {
                 if (originalDistance >= 0)
                     distance = Math.Max(distance, state.MinDistance);
                 else
@@ -1152,13 +1239,16 @@ namespace SharpFontManaged {
                 state.Rp0 = pointIndex;
         }
 
-        Vector2 ComputeDisplacement (int mode, out Zone zone, out int point) {
+        private Vector2 ComputeDisplacement(int mode, out Zone zone, out int point)
+        {
             // compute displacement of the reference point
-            if ((mode & 1) == 0) {
+            if ((mode & 1) == 0)
+            {
                 zone = zp1;
                 point = state.Rp2;
             }
-            else {
+            else
+            {
                 zone = zp0;
                 point = state.Rp1;
             }
@@ -1167,7 +1257,8 @@ namespace SharpFontManaged {
             return distance * state.Freedom / fdotp;
         }
 
-        TouchState GetTouchState () {
+        private TouchState GetTouchState()
+        {
             var touch = TouchState.None;
             if (state.Freedom.X != 0)
                 touch = TouchState.X;
@@ -1177,9 +1268,11 @@ namespace SharpFontManaged {
             return touch;
         }
 
-        void ShiftPoints (Vector2 displacement) {
+        private void ShiftPoints(Vector2 displacement)
+        {
             var touch = GetTouchState();
-            for (int i = 0; i < state.Loop; i++) {
+            for (var i = 0; i < state.Loop; i++)
+            {
                 var pointIndex = stack.Pop();
                 zp2.Current[pointIndex].P += displacement;
                 zp2.TouchState[pointIndex] |= touch;
@@ -1187,15 +1280,18 @@ namespace SharpFontManaged {
             state.Loop = 1;
         }
 
-        void MovePoint (Zone zone, int index, float distance) {
+        private void MovePoint(Zone zone, int index, float distance)
+        {
             var point = zone.GetCurrent(index) + distance * state.Freedom / fdotp;
             var touch = GetTouchState();
             zone.Current[index].P = point;
             zone.TouchState[index] |= touch;
         }
 
-        float Round (float value) {
-            switch (state.RoundState) {
+        private float Round(float value)
+        {
+            switch (state.RoundState)
+            {
                 case RoundMode.ToGrid: return value >= 0 ? (float)Math.Round(value) : -(float)Math.Round(-value);
                 case RoundMode.ToHalfGrid: return value >= 0 ? (float)Math.Floor(value) + 0.5f : -((float)Math.Floor(-value) + 0.5f);
                 case RoundMode.ToDoubleGrid: return value >= 0 ? (float)(Math.Round(value * 2, MidpointRounding.AwayFromZero) / 2) : -(float)(Math.Round(-value * 2, MidpointRounding.AwayFromZero) / 2);
@@ -1204,14 +1300,16 @@ namespace SharpFontManaged {
                 case RoundMode.Super:
                 case RoundMode.Super45:
                     float result;
-                    if (value >= 0) {
+                    if (value >= 0)
+                    {
                         result = value - roundPhase + roundThreshold;
                         result = (float)Math.Truncate(result / roundPeriod) * roundPeriod;
                         result += roundPhase;
                         if (result < 0)
                             result = roundPhase;
                     }
-                    else {
+                    else
+                    {
                         result = -value - roundPhase + roundThreshold;
                         result = -(float)Math.Truncate(result / roundPeriod) * roundPeriod;
                         result -= roundPhase;
@@ -1224,13 +1322,22 @@ namespace SharpFontManaged {
             }
         }
 
-        float Project (Vector2 point) => Vector2.Dot(point, state.Projection);
-        float DualProject (Vector2 point) => Vector2.Dot(point, state.DualProjection);
+        private float Project(Vector2 point)
+        {
+            return Vector2.Dot(point, state.Projection);
+        }
 
-        static OpCode SkipNext (ref InstructionStream stream) {
+        private float DualProject(Vector2 point)
+        {
+            return Vector2.Dot(point, state.DualProjection);
+        }
+
+        private static OpCode SkipNext(ref InstructionStream stream)
+        {
             // grab the next opcode, and if it's one of the push instructions skip over its arguments
             var opcode = stream.NextOpCode();
-            switch (opcode) {
+            switch (opcode)
+            {
                 case OpCode.NPUSHB:
                 case OpCode.PUSHB1:
                 case OpCode.PUSHB2:
@@ -1242,7 +1349,7 @@ namespace SharpFontManaged {
                 case OpCode.PUSHB8:
                     {
                         var count = opcode == OpCode.NPUSHB ? stream.NextByte() : opcode - OpCode.PUSHB1 + 1;
-                        for (int i = 0; i < count; i++)
+                        for (var i = 0; i < count; i++)
                             stream.NextByte();
                     }
                     break;
@@ -1257,7 +1364,7 @@ namespace SharpFontManaged {
                 case OpCode.PUSHW8:
                     {
                         var count = opcode == OpCode.NPUSHW ? stream.NextByte() : opcode - OpCode.PUSHW1 + 1;
-                        for (int i = 0; i < count; i++)
+                        for (var i = 0; i < count; i++)
                             stream.NextWord();
                     }
                     break;
@@ -1266,7 +1373,8 @@ namespace SharpFontManaged {
             return opcode;
         }
 
-        static unsafe void InterpolatePoints (byte* current, byte* original, int start, int end, int ref1, int ref2) {
+        private static unsafe void InterpolatePoints(byte* current, byte* original, int start, int end, int ref1, int ref2)
+        {
             if (start > end)
                 return;
 
@@ -1275,7 +1383,8 @@ namespace SharpFontManaged {
             float delta1, delta2;
             var lower = *GetPoint(original, ref1);
             var upper = *GetPoint(original, ref2);
-            if (lower > upper) {
+            if (lower > upper)
+            {
                 var temp = lower;
                 lower = upper;
                 upper = temp;
@@ -1283,7 +1392,8 @@ namespace SharpFontManaged {
                 delta1 = *GetPoint(current, ref2) - lower;
                 delta2 = *GetPoint(current, ref1) - upper;
             }
-            else {
+            else
+            {
                 delta1 = *GetPoint(current, ref1) - lower;
                 delta2 = *GetPoint(current, ref2) - upper;
             }
@@ -1292,7 +1402,8 @@ namespace SharpFontManaged {
             var upperCurrent = delta2 + upper;
             var scale = (upperCurrent - lowerCurrent) / (upper - lower);
 
-            for (int i = start; i <= end; i++) {
+            for (var i = start; i <= end; i++)
+            {
                 // three cases: if it's to the left of the lower reference point or to
                 // the right of the upper reference point, do a shift based on that ref point.
                 // otherwise, interpolate between the two of them
@@ -1307,42 +1418,74 @@ namespace SharpFontManaged {
             }
         }
 
-        static float F2Dot14ToFloat (int value) => (short)value / 16384.0f;
-        static int FloatToF2Dot14 (float value) => (int)(uint)(short)Math.Round(value * 16384.0f);
-        static float F26Dot6ToFloat (int value) => value / 64.0f;
-        static int FloatToF26Dot6 (float value) => (int)Math.Round(value * 64.0f);
+        private static float F2Dot14ToFloat(int value)
+        {
+            return (short)value / 16384.0f;
+        }
 
-        unsafe static float* GetPoint (byte* data, int index) => (float*)(data + sizeof(PointF) * index);
+        private static int FloatToF2Dot14(float value)
+        {
+            return (int)(uint)(short)Math.Round(value * 16384.0f);
+        }
 
-        static readonly float Sqrt2Over2 = (float)(Math.Sqrt(2) / 2);
+        private static float F26Dot6ToFloat(int value)
+        {
+            return value / 64.0f;
+        }
 
-        const int MaxCallStack = 128;
-        const float Epsilon = 0.000001f;
+        private static int FloatToF26Dot6(float value)
+        {
+            return (int)Math.Round(value * 64.0f);
+        }
 
-        struct InstructionStream {
-            byte[] instructions;
-            int ip;
+        private static unsafe float* GetPoint(byte* data, int index)
+        {
+            return (float*)(data + sizeof(PointF) * index);
+        }
+
+        private static readonly float Sqrt2Over2 = (float)(Math.Sqrt(2) / 2);
+        private const int MaxCallStack = 128;
+        private const float Epsilon = 0.000001f;
+
+        private struct InstructionStream
+        {
+            private readonly byte[] instructions;
+            private int ip;
 
             public bool IsValid => instructions != null;
             public bool Done => ip >= instructions.Length;
 
-            public InstructionStream (byte[] instructions) {
+            public InstructionStream(byte[] instructions)
+            {
                 this.instructions = instructions;
                 ip = 0;
             }
 
-            public int NextByte () {
+            public int NextByte()
+            {
                 if (Done)
                     throw new InvalidFontException();
                 return instructions[ip++];
             }
 
-            public OpCode NextOpCode () => (OpCode)NextByte();
-            public int NextWord () => (short)(ushort)(NextByte() << 8 | NextByte());
-            public void Jump (int offset) => ip += offset;
+            public OpCode NextOpCode()
+            {
+                return (OpCode)NextByte();
+            }
+
+            public int NextWord()
+            {
+                return (short)(ushort)(NextByte() << 8 | NextByte());
+            }
+
+            public void Jump(int offset)
+            {
+                ip += offset;
+            }
         }
 
-        struct GraphicsState {
+        private struct GraphicsState
+        {
             public Vector2 Freedom;
             public Vector2 DualProjection;
             public Vector2 Projection;
@@ -1360,7 +1503,8 @@ namespace SharpFontManaged {
             public int Rp2;
             public bool AutoFlip;
 
-            public void Reset () {
+            public void Reset()
+            {
                 Freedom = Vector2.UnitX;
                 Projection = Vector2.UnitX;
                 DualProjection = Vector2.UnitX;
@@ -1378,36 +1522,86 @@ namespace SharpFontManaged {
             }
         }
 
-        class ExecutionStack {
-            int[] s;
-            int count;
+        private class ExecutionStack
+        {
+            private readonly int[] s;
+            private int count;
 
-            public ExecutionStack (int maxStack) {
+            public ExecutionStack(int maxStack)
+            {
                 s = new int[maxStack];
             }
 
-            public int Peek () => Peek(0);
-            public bool PopBool () => Pop() != 0;
-            public float PopFloat () => F26Dot6ToFloat(Pop());
-            public void Push (bool value) => Push(value ? 1 : 0);
-            public void Push (float value) => Push(FloatToF26Dot6(value));
+            public int Peek()
+            {
+                return Peek(0);
+            }
 
-            public void Clear () => count = 0;
-            public void Depth () => Push(count);
-            public void Duplicate () => Push(Peek());
-            public void Copy () => Copy(Pop() - 1);
-            public void Copy (int index) => Push(Peek(index));
-            public void Move () => Move(Pop() - 1);
-            public void Roll () => Move(2);
+            public bool PopBool()
+            {
+                return Pop() != 0;
+            }
 
-            public void Move (int index) {
+            public float PopFloat()
+            {
+                return F26Dot6ToFloat(Pop());
+            }
+
+            public void Push(bool value)
+            {
+                Push(value ? 1 : 0);
+            }
+
+            public void Push(float value)
+            {
+                Push(FloatToF26Dot6(value));
+            }
+
+            public void Clear()
+            {
+                count = 0;
+            }
+
+            public void Depth()
+            {
+                Push(count);
+            }
+
+            public void Duplicate()
+            {
+                Push(Peek());
+            }
+
+            public void Copy()
+            {
+                Copy(Pop() - 1);
+            }
+
+            public void Copy(int index)
+            {
+                Push(Peek(index));
+            }
+
+            public void Move()
+            {
+                Move(Pop() - 1);
+            }
+
+            public void Roll()
+            {
+                Move(2);
+            }
+
+            public void Move(int index)
+            {
                 var val = Peek(index);
-                for (int i = count - index - 1; i < count - 1; i++)
+                for (var i = count - index - 1; i < count - 1; i++)
                     s[i] = s[i + 1];
                 s[count - 1] = val;
             }
 
-            public void Swap () {
+            public void Swap()
+            {
                 if (count < 2)
                     throw new InvalidFontException();
 
@@ -1416,43 +1610,56 @@ namespace SharpFontManaged {
                 s[count - 2] = tmp;
             }
 
-            public void Push (int value) {
+            public void Push(int value)
+            {
                 if (count == s.Length)
                     throw new InvalidFontException();
                 s[count++] = value;
             }
 
-            public int Pop () {
+            public int Pop()
+            {
                 if (count == 0)
                     throw new InvalidFontException();
                 return s[--count];
             }
 
-            public int Peek (int index) {
+            public int Peek(int index)
+            {
                 if (index < 0 || index >= count)
                     throw new InvalidFontException();
                 return s[count - index - 1];
             }
         }
 
-        struct Zone {
+        private struct Zone
+        {
             public PointF[] Current;
             public PointF[] Original;
             public TouchState[] TouchState;
             public bool IsTwilight;
 
-            public Zone (PointF[] points, bool isTwilight) {
+            public Zone(PointF[] points, bool isTwilight)
+            {
                 IsTwilight = isTwilight;
                 Current = points;
                 Original = (PointF[])points.Clone();
                 TouchState = new TouchState[points.Length];
             }
 
-            public Vector2 GetCurrent (int index) => Current[index].P;
-            public Vector2 GetOriginal (int index) => Original[index].P;
+            public Vector2 GetCurrent(int index)
+            {
+                return Current[index].P;
+            }
+
+            public Vector2 GetOriginal(int index)
+            {
+                return Original[index].P;
+            }
         }
 
-        enum RoundMode {
+        private enum RoundMode
+        {
             ToHalfGrid,
             ToGrid,
             ToDoubleGrid,
@@ -1464,21 +1671,24 @@ namespace SharpFontManaged {
         }
 
         [Flags]
-        enum InstructionControlFlags {
+        private enum InstructionControlFlags
+        {
             None,
             InhibitGridFitting = 0x1,
             UseDefaultGraphicsState = 0x2
         }
 
         [Flags]
-        enum TouchState {
+        private enum TouchState
+        {
             None = 0,
             X = 0x1,
             Y = 0x2,
             Both = X | Y
         }
 
-        enum OpCode : byte {
+        private enum OpCode : byte
+        {
             SVTCA0,
             SVTCA1,
             SPVTCA0,

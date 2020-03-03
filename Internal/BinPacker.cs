@@ -1,47 +1,63 @@
 ﻿using System;
 
-namespace SharpFontManaged {
-    struct Rect {
+namespace SharpFontManaged
+{
+    internal struct Rect
+    {
+
         public int X, Y, Width, Height;
 
         public int Right => X + Width;
         public int Bottom => Y + Height;
 
-        public Rect (int x, int y, int width, int height) {
+        public Rect(int x, int y, int width, int height)
+        {
             X = x;
             Y = y;
             Width = width;
             Height = height;
         }
 
-        public bool Contains (Rect rect) {
+        public bool Contains(Rect rect)
+        {
             return rect.X >= X && rect.Y >= Y &&
                    rect.Right <= Right && rect.Bottom <= Bottom;
         }
 
-        public override string ToString () => $"{X}, {Y}, {Width}, {Height}";
+        public override string ToString()
+        {
+            return $"X: {X}, Y: {Y}, Width: {Width}, Height: {Height}";
+        }
     }
 
-    struct ResizableArray<T> {
+    internal struct ResizableArray<T>
+    {
+
         public T[] Data;
         public int Count;
 
         public T this[int index] => Data[index];
 
-        public ResizableArray (int capacity) {
+        public ResizableArray(int capacity)
+        {
             Data = new T[capacity];
             Count = 0;
         }
 
-        public void Clear () => Count = 0;
+        public void Clear()
+        {
+            Count = 0;
+        }
 
-        public void Add (T value) {
+        public void Add(T value)
+        {
             if (Count == Data.Length)
                 Array.Resize(ref Data, (int)(Data.Length * 1.5));
             Data[Count++] = value;
         }
 
-        public void RemoveAt (int index) {
+        public void RemoveAt(int index)
+        {
             Count--;
             if (index < Count)
                 Array.Copy(Data, index + 1, Data, index, Count - index);
@@ -49,26 +65,33 @@ namespace SharpFontManaged {
     }
 
     // based on the "MAXRECTS" method developed by Jukka Jylänki: http://clb.demon.fi/files/RectangleBinPack.pdf
-    struct BinPacker {
-        ResizableArray<Rect> freeList;
+    internal struct BinPacker
+    {
 
-        public BinPacker (int width, int height) {
+        private ResizableArray<Rect> freeList;
+
+        public BinPacker(int width, int height)
+        {
             freeList = new ResizableArray<Rect>(16);
             freeList.Add(new Rect(0, 0, width, height));
         }
 
-        public void Clear (int width, int height) {
+        public void Clear(int width, int height)
+        {
             freeList.Clear();
             freeList.Add(new Rect(0, 0, width, height));
         }
 
-        public Rect Insert (int width, int height) {
+        public Rect Insert(int width, int height)
+        {
             var bestNode = new Rect();
             var bestShortFit = int.MaxValue;
             var bestLongFit = int.MaxValue;
 
             var count = freeList.Count;
-            for (int i = 0; i < count; i++) {
+            
+            for (var i = 0; i < count; i++)
+            {
                 // try to place the rect
                 var rect = freeList[i];
                 if (rect.Width < width || rect.Height < height)
@@ -79,7 +102,8 @@ namespace SharpFontManaged {
                 var shortFit = Math.Min(leftoverX, leftoverY);
                 var longFit = Math.Max(leftoverX, leftoverY);
 
-                if (shortFit < bestShortFit || (shortFit == bestShortFit && longFit < bestLongFit)) {
+                if (shortFit < bestShortFit || (shortFit == bestShortFit && longFit < bestLongFit))
+                {
                     bestNode = new Rect(rect.X, rect.Y, width, height);
                     bestShortFit = shortFit;
                     bestLongFit = longFit;
@@ -90,8 +114,10 @@ namespace SharpFontManaged {
                 return bestNode;
 
             // split out free areas into smaller ones
-            for (int i = 0; i < count; i++) {
-                if (SplitFreeNode(freeList[i], bestNode)) {
+            for (var i = 0; i < count; i++)
+            {
+                if (SplitFreeNode(freeList[i], bestNode))
+                {
                     freeList.RemoveAt(i);
                     i--;
                     count--;
@@ -99,17 +125,21 @@ namespace SharpFontManaged {
             }
 
             // prune the freelist
-            for (int i = 0; i < freeList.Count; i++) {
-                for (int j = i + 1; j < freeList.Count; j++) {
+            for (var i = 0; i < freeList.Count; i++)
+            {
+                for (var j = i + 1; j < freeList.Count; j++)
+                {
                     var idata = freeList[i];
                     var jdata = freeList[j];
-                    if (jdata.Contains(idata)) {
+                    if (jdata.Contains(idata))
+                    {
                         freeList.RemoveAt(i);
                         i--;
                         break;
                     }
 
-                    if (idata.Contains(jdata)) {
+                    if (idata.Contains(jdata))
+                    {
                         freeList.RemoveAt(j);
                         j--;
                     }
@@ -119,23 +149,27 @@ namespace SharpFontManaged {
             return bestNode;
         }
 
-        bool SplitFreeNode (Rect freeNode, Rect usedNode) {
+        private bool SplitFreeNode(Rect freeNode, Rect usedNode)
+        {
             // test if the rects even intersect
             var insideX = usedNode.X < freeNode.Right && usedNode.Right > freeNode.X;
             var insideY = usedNode.Y < freeNode.Bottom && usedNode.Bottom > freeNode.Y;
             if (!insideX || !insideY)
                 return false;
 
-            if (insideX) {
+            if (insideX)
+            {
                 // new node at the top side of the used node
-                if (usedNode.Y > freeNode.Y && usedNode.Y < freeNode.Bottom) {
+                if (usedNode.Y > freeNode.Y && usedNode.Y < freeNode.Bottom)
+                {
                     var newNode = freeNode;
                     newNode.Height = usedNode.Y - newNode.Y;
                     freeList.Add(newNode);
                 }
 
                 // new node at the bottom side of the used node
-                if (usedNode.Bottom < freeNode.Bottom) {
+                if (usedNode.Bottom < freeNode.Bottom)
+                {
                     var newNode = freeNode;
                     newNode.Y = usedNode.Bottom;
                     newNode.Height = freeNode.Bottom - usedNode.Bottom;
@@ -143,16 +177,19 @@ namespace SharpFontManaged {
                 }
             }
 
-            if (insideY) {
+            if (insideY)
+            {
                 // new node at the left side of the used node
-                if (usedNode.X > freeNode.X && usedNode.X < freeNode.Right) {
+                if (usedNode.X > freeNode.X && usedNode.X < freeNode.Right)
+                {
                     var newNode = freeNode;
                     newNode.Width = usedNode.X - newNode.X;
                     freeList.Add(newNode);
                 }
 
                 // new node at the right side of the used node
-                if (usedNode.Right < freeNode.Right) {
+                if (usedNode.Right < freeNode.Right)
+                {
                     var newNode = freeNode;
                     newNode.X = usedNode.Right;
                     newNode.Width = freeNode.Right - usedNode.Right;

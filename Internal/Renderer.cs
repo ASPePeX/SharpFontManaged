@@ -1,24 +1,27 @@
 ﻿using System;
 using System.Numerics;
 
-namespace SharpFontManaged {
+namespace SharpFontManaged
+{
     // handles rasterizing curves to a bitmap
     // the algorithm is heavily inspired by the FreeType2 renderer; thanks guys!
-    public  unsafe class Renderer {
-        Surface surface;                // the surface we're currently rendering to
-        int[] scanlines;                // one scanline per Y, points into cell buffer
-        int[] curveLevels;
-        Vector2[] bezierArc;            // points on a bezier arc
-        Cell[] cells;
-        Vector2 activePoint;            // subpixel position of active point
-        float activeArea;               // running total of the active cell's area
-        float activeCoverage;           // ditto for coverage
-        int cellX, cellY;               // pixel position of the active cell
-        int cellCount;                  // number of cells in active use
-        int width, height;              // bounds of the glyph surface, in plain old pixels
-        bool cellActive;                // whether the current cell has active data
+    public unsafe class Renderer
+    {
+        private Surface surface;                // the surface we're currently rendering to
+        private int[] scanlines;                // one scanline per Y, points into cell buffer
+        private int[] curveLevels;
+        private Vector2[] bezierArc;            // points on a bezier arc
+        private Cell[] cells;
+        private Vector2 activePoint;            // subpixel position of active point
+        private float activeArea;               // running total of the active cell's area
+        private float activeCoverage;           // ditto for coverage
+        private int cellX, cellY;               // pixel position of the active cell
+        private int cellCount;                  // number of cells in active use
+        private int width, height;              // bounds of the glyph surface, in plain old pixels
+        private bool cellActive;                // whether the current cell has active data
 
-        public void Start (int width, int height) {
+        public void Start(int width, int height)
+        {
             this.width = width;
             this.height = height;
 
@@ -27,20 +30,24 @@ namespace SharpFontManaged {
             activeCoverage = 0.0f;
             cellActive = false;
 
-            if (cells == null) {
+            if (cells == null)
+            {
                 cells = new Cell[1024];
                 curveLevels = new int[32];
                 bezierArc = new Vector2[curveLevels.Length * 3 + 1];
                 scanlines = new int[height];
             }
             else if (height >= scanlines.Length)
+            {
                 scanlines = new int[height];
+            }
 
-            for (int i = 0; i < height; i++)
+            for (var i = 0; i < height; i++)
                 scanlines[i] = -1;
         }
 
-        public void MoveTo (Vector2 point) {
+        public void MoveTo(Vector2 point)
+        {
             // record current cell, if any
             if (cellActive)
                 RetireActiveCell();
@@ -56,14 +63,16 @@ namespace SharpFontManaged {
             activeCoverage = 0.0f;
         }
 
-        public void LineTo (Vector2 point) {
+        public void LineTo(Vector2 point)
+        {
             // figure out which scanlines this line crosses
             var startScanline = (int)activePoint.Y;
             var endScanline = (int)point.Y;
 
             // vertical clipping
             if (Math.Min(startScanline, endScanline) >= height ||
-                Math.Max(startScanline, endScanline) < 0) {
+                Math.Max(startScanline, endScanline) < 0)
+            {
                 // just save this position since it's outside our bounds and continue
                 activePoint = point;
                 return;
@@ -74,11 +83,13 @@ namespace SharpFontManaged {
             var fringeStart = activePoint.Y - startScanline;
             var fringeEnd = point.Y - endScanline;
 
-            if (startScanline == endScanline) {
+            if (startScanline == endScanline)
+            {
                 // this is a horizontal line
                 RenderScanline(startScanline, activePoint.X, fringeStart, point.X, fringeEnd);
             }
-            else if (vector.X == 0) {
+            else if (vector.X == 0)
+            {
                 // this is a vertical line
                 var x = (int)activePoint.X;
                 var xarea = (activePoint.X - x) * 2;
@@ -86,7 +97,8 @@ namespace SharpFontManaged {
                 // check if we're scanning up or down
                 var first = 1.0f;
                 var increment = 1;
-                if (vector.Y < 0) {
+                if (vector.Y < 0)
+                {
                     first = 0.0f;
                     increment = -1;
                 }
@@ -101,7 +113,8 @@ namespace SharpFontManaged {
                 // any other cells covered by the line
                 deltaY = first + first - 1.0f;
                 var area = xarea * deltaY;
-                while (startScanline != endScanline) {
+                while (startScanline != endScanline)
+                {
                     activeArea += area;
                     activeCoverage += deltaY;
                     startScanline += increment;
@@ -113,13 +126,15 @@ namespace SharpFontManaged {
                 activeArea += xarea * deltaY;
                 activeCoverage += deltaY;
             }
-            else {
+            else
+            {
                 // diagonal line
                 // check if we're scanning up or down
                 var dist = (1.0f - fringeStart) * vector.X;
                 var first = 1.0f;
                 var increment = 1;
-                if (vector.Y < 0) {
+                if (vector.Y < 0)
+                {
                     dist = fringeStart * vector.X;
                     first = 0.0f;
                     increment = -1;
@@ -134,9 +149,11 @@ namespace SharpFontManaged {
                 SetCurrentCell((int)x, startScanline);
 
                 // step along the line
-                if (startScanline != endScanline) {
+                if (startScanline != endScanline)
+                {
                     delta = vector.X / vector.Y;
-                    while (startScanline != endScanline) {
+                    while (startScanline != endScanline)
+                    {
                         var x2 = x + delta;
                         RenderScanline(startScanline, x, 1.0f - first, x2, first);
                         x = x2;
@@ -153,7 +170,8 @@ namespace SharpFontManaged {
             activePoint = point;
         }
 
-        public void QuadraticCurveTo (Vector2 control, Vector2 point) {
+        public void QuadraticCurveTo(Vector2 control, Vector2 point)
+        {
             var levels = curveLevels;
             var arc = bezierArc;
             arc[0] = point;
@@ -166,24 +184,28 @@ namespace SharpFontManaged {
                 dx = delta.Y;
 
             // short cut for small arcs
-            if (dx < 0.25f) {
+            if (dx < 0.25f)
+            {
                 LineTo(arc[0]);
                 return;
             }
 
-            int level = 0;
-            do {
+            var level = 0;
+            do
+            {
                 dx /= 4.0f;
                 level++;
             } while (dx > 0.25f);
 
-            int top = 0;
-            int arcIndex = 0;
+            var top = 0;
+            var arcIndex = 0;
             levels[0] = level;
 
-            while (top >= 0) {
+            while (top >= 0)
+            {
                 level = levels[top];
-                if (level > 0) {
+                if (level > 0)
+                {
                     // split the arc
                     arc[arcIndex + 4] = arc[arcIndex + 2];
                     var b = arc[arcIndex + 1];
@@ -195,7 +217,8 @@ namespace SharpFontManaged {
                     top++;
                     levels[top] = levels[top - 1] = level - 1;
                 }
-                else {
+                else
+                {
                     LineTo(arc[arcIndex]);
                     top--;
                     arcIndex -= 2;
@@ -203,7 +226,8 @@ namespace SharpFontManaged {
             }
         }
 
-        public void BlitTo (Surface surface) {
+        public void BlitTo(Surface surface)
+        {
             if (cellActive)
                 RetireActiveCell();
 
@@ -212,12 +236,14 @@ namespace SharpFontManaged {
                 return;
 
             this.surface = surface;
-            for (int y = 0; y < height; y++) {
+            for (var y = 0; y < height; y++)
+            {
                 var x = 0;
                 var coverage = 0.0f;
                 var index = scanlines[y];
 
-                while (index != -1) {
+                while (index != -1)
+                {
                     // cap off the previous span, if we had one
                     var cell = cells[index];
                     if (cell.X > x && coverage != 0.0f)
@@ -239,7 +265,8 @@ namespace SharpFontManaged {
             }
         }
 
-        void FillHLine (int x, int y, float coveragePercentage, int length) {
+        private void FillHLine(int x, int y, float coveragePercentage, int length)
+        {
             var coverage = (int)Math.Round(coveragePercentage * 255, MidpointRounding.AwayFromZero);
             if (coverage == 0)
                 return;
@@ -254,24 +281,27 @@ namespace SharpFontManaged {
 
             // finally fill pixels
             var p = bits + x;
-            for (int i = 0; i < length; i++)
+            for (var i = 0; i < length; i++)
                 *p++ = c;
         }
 
-        void RenderScanline (int scanline, float x1, float y1, float x2, float y2) {
+        private void RenderScanline(int scanline, float x1, float y1, float x2, float y2)
+        {
             var startCell = (int)x1;
             var endCell = (int)x2;
             var fringeStart = x1 - startCell;
             var fringeEnd = x2 - endCell;
 
             // trivial case; exact same Y, down to the subpixel
-            if (y1 == y2) {
+            if (y1 == y2)
+            {
                 SetCurrentCell(endCell, scanline);
                 return;
             }
 
             // trivial case; within the same cell
-            if (startCell == endCell) {
+            if (startCell == endCell)
+            {
                 var deltaY = y2 - y1;
                 activeArea += (fringeStart + fringeEnd) * deltaY;
                 activeCoverage += deltaY;
@@ -286,7 +316,8 @@ namespace SharpFontManaged {
             var dist = (1.0f - fringeStart) * dy;
             var first = 1.0f;
             var increment = 1;
-            if (dx < 0) {
+            if (dx < 0)
+            {
                 dist = fringeStart * dy;
                 first = 0.0f;
                 increment = -1;
@@ -303,11 +334,13 @@ namespace SharpFontManaged {
             y1 += delta;
 
             // update all covered cells
-            if (startCell != endCell) {
+            if (startCell != endCell)
+            {
                 dist = y2 - y1 + delta;
                 delta = dist / dx;
 
-                while (startCell != endCell) {
+                while (startCell != endCell)
+                {
                     activeArea += delta;
                     activeCoverage += delta;
                     y1 += delta;
@@ -322,13 +355,15 @@ namespace SharpFontManaged {
             activeCoverage += delta;
         }
 
-        void SetCurrentCell (int x, int y) {
+        private void SetCurrentCell(int x, int y)
+        {
             // all cells on the left of the clipping region go to the minX - 1 position
             x = Math.Min(x, width);
             x = Math.Max(x, -1);
 
             // moving to a new cell?
-            if (x != cellX || y != cellY) {
+            if (x != cellX || y != cellY)
+            {
                 if (cellActive)
                     RetireActiveCell();
 
@@ -341,7 +376,8 @@ namespace SharpFontManaged {
             cellActive = cellX < width && cellY < height;
         }
 
-        void RetireActiveCell () {
+        private void RetireActiveCell()
+        {
             // cells with no coverage have nothing to do
             if (activeArea == 0.0f && activeCoverage == 0.0f)
                 return;
@@ -350,7 +386,8 @@ namespace SharpFontManaged {
             var x = cellX;
             var y = cellY;
             var cell = scanlines[y];
-            if (cell == -1 || cells[cell].X > x) {
+            if (cell == -1 || cells[cell].X > x)
+            {
                 // no cells at all on this scanline yet, or the first one
                 // is already beyond our X value, so grab a new one
                 cell = GetNewCell(x, cell);
@@ -358,9 +395,11 @@ namespace SharpFontManaged {
                 return;
             }
 
-            while (cells[cell].X != x) {
+            while (cells[cell].X != x)
+            {
                 var next = cells[cell].Next;
-                if (next == -1 || cells[next].X > x) {
+                if (next == -1 || cells[next].X > x)
+                {
                     // either we reached the end of the chain in this
                     // scanline, or the next cell has a larger X
                     next = GetNewCell(x, next);
@@ -377,7 +416,8 @@ namespace SharpFontManaged {
             cells[cell].Coverage += activeCoverage;
         }
 
-        int GetNewCell (int x, int next) {
+        private int GetNewCell(int x, int next)
+        {
             // resize our array if we've run out of room
             if (cellCount == cells.Length)
                 Array.Resize(ref cells, (int)(cells.Length * 1.5));
@@ -391,7 +431,8 @@ namespace SharpFontManaged {
             return index;
         }
 
-        struct Cell {
+        private struct Cell
+        {
             public int X;
             public int Next;
             public float Coverage;
